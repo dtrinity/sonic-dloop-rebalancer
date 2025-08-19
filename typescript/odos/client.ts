@@ -1,6 +1,12 @@
-import axios from "axios";
+import axios, { AxiosInstance } from "axios";
 import { ethers } from "ethers";
 import { logger } from "../common/log";
+import {
+  DEFAULT_RETRY_ATTEMPTS,
+  DEFAULT_HTTP_TIMEOUT_MS,
+  RETRY_BASE_DELAY_MS,
+  getHttpTimeoutMs
+} from "../../config/constants";
 import {
   AssembleRequest,
   AssembleResponse,
@@ -9,6 +15,8 @@ import {
 } from "./types";
 
 export class OdosClient {
+  private readonly axiosInstance: AxiosInstance;
+
   /**
    * Create a new ODOS client instance
    *
@@ -18,7 +26,55 @@ export class OdosClient {
   constructor(
     private readonly baseUrl: string = "https://api.odos.xyz",
     private readonly chainId?: number,
-  ) {}
+  ) {
+    this.axiosInstance = axios.create({
+      baseURL: baseUrl,
+      timeout: getHttpTimeoutMs(),
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+  }
+
+  private async retryRequest<T>(
+    operation: () => Promise<T>,
+    operationName: string,
+    maxRetries: number = DEFAULT_RETRY_ATTEMPTS
+  ): Promise<T> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Check if error is retryable
+        const isRetryable = axios.isAxiosError(error) && (
+          !error.response ||
+          error.response.status >= 500 ||
+          error.response.status === 429 ||
+          error.code === 'ETIMEDOUT' ||
+          error.code === 'ECONNRESET' ||
+          error.code === 'ENOTFOUND'
+        );
+
+        if (!isRetryable || attempt === maxRetries) {
+          throw lastError;
+        }
+
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        logger.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`, {
+          error: lastError.message,
+          attempt
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`);
+  }
 
   /**
    * Generate a quote for a swap through ODOS
@@ -34,14 +90,11 @@ export class OdosClient {
       );
     }
 
-    try {
+    return this.retryRequest(async () => {
       logger.debug("Requesting Odos quote:", request);
-      const response = await axios.post<QuoteResponse>(
-        `${this.baseUrl}/sor/quote/v2`,
+      const response = await this.axiosInstance.post<QuoteResponse>(
+        "/sor/quote/v2",
         request,
-        {
-          headers: { "Content-Type": "application/json" },
-        },
       );
 
       if (
@@ -57,16 +110,7 @@ export class OdosClient {
 
       logger.debug("Odos quote response:", response.data);
       return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        logger.error("ODOS API Error:", error.response.data);
-        throw new Error(
-          `Quote failed: ${error.response.data.message || error.message}`,
-        );
-      }
-      logger.error("Unexpected error:", error);
-      throw error;
-    }
+    }, "Odos getQuote");
   }
 
   /**
@@ -78,14 +122,11 @@ export class OdosClient {
   async assembleTransaction(
     request: AssembleRequest,
   ): Promise<AssembleResponse> {
-    try {
+    return this.retryRequest(async () => {
       logger.debug("Assembling Odos transaction:", request);
-      const response = await axios.post<AssembleResponse>(
-        `${this.baseUrl}/sor/assemble`,
+      const response = await this.axiosInstance.post<AssembleResponse>(
+        "/sor/assemble",
         request,
-        {
-          headers: { "Content-Type": "application/json" },
-        },
       );
 
       const data = response.data as any;
@@ -100,14 +141,7 @@ export class OdosClient {
 
       logger.debug("Odos assemble response:", response.data);
       return response.data;
-    } catch (error) {
-      if (axios.isAxiosError(error) && error.response) {
-        throw new Error(
-          `Assembly failed: ${error.response.data.message || error.message}`,
-        );
-      }
-      throw error;
-    }
+    }, "Odos assembleTransaction");
   }
 
   /**

@@ -4,9 +4,10 @@ export const localhostConfig: BotConfig = {
   network: {
     chainId: 31337,
     rpcUrl: "http://127.0.0.1:8545",
-    privateKey: "",
+    privateKey: process.env.PRIVATE_KEY || "",
   },
   contracts: {
+    // Will be deployed in test
     dloopCore: "",
     increaseOdos: "",
     decreaseOdos: "",

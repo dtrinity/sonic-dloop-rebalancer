@@ -4,14 +4,14 @@ export const sonicTestnetConfig: BotConfig = {
   network: {
     chainId: 57054,
     rpcUrl: "https://rpc.testnet.soniclabs.com",
-    privateKey: "",
+    privateKey: process.env.PRIVATE_KEY || "",
   },
   contracts: {
-    dloopCore: "",
-    increaseOdos: "",
-    decreaseOdos: "",
+    dloopCore: "", // TODO: add testnet address
+    increaseOdos: "", // TODO: add testnet address
+    decreaseOdos: "", // TODO: add testnet address
     odosRouter: "", // Odos doesn't work on sonic testnet
-    flashLender: "",
+    flashLender: "", // TODO: add testnet address
   },
   tokens: {
     collateral: {

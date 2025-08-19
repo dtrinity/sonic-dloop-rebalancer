@@ -1,4 +1,5 @@
 import { getConfig } from "../../config/config";
+import { IGNORE_DURATION_MS } from "../../config/constants";
 import { logger } from "../common/log";
 import { FileCache } from "../common/cache";
 import { ContractManager } from "./contracts";
@@ -97,8 +98,8 @@ class RebalanceBotRunner {
       return false;
     }
 
-    // Ignore for 5 minutes after last entry
-    const ignoreUntil = entry.timestamp + 5 * 60 * 1000;
+    // Ignore for configured duration after last entry
+    const ignoreUntil = entry.timestamp + IGNORE_DURATION_MS;
     const now = Date.now();
 
     if (now < ignoreUntil) {
@@ -143,6 +144,31 @@ async function main(): Promise<void> {
   process.on("SIGTERM", () => {
     logger.info("Received SIGTERM, shutting down gracefully...");
     bot.stop();
+  });
+
+  // Handle unhandled promise rejections
+  process.on("unhandledRejection", (reason, promise) => {
+    logger.error("Unhandled promise rejection:", {
+      reason: reason instanceof Error ? reason.message : String(reason),
+      stack: reason instanceof Error ? reason.stack : undefined,
+      promise: promise.toString()
+    });
+    // Don't exit immediately - let the bot continue running unless it's a critical error
+    if (reason instanceof Error && reason.message.includes("ECONNREFUSED")) {
+      logger.error("Critical connection error detected, stopping bot");
+      bot.stop();
+    }
+  });
+
+  // Handle uncaught exceptions
+  process.on("uncaughtException", (error) => {
+    logger.error("Uncaught exception:", {
+      message: error.message,
+      stack: error.stack
+    });
+    logger.error("Shutting down due to uncaught exception");
+    bot.stop();
+    process.exit(1);
   });
 
   try {

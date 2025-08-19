@@ -6,7 +6,8 @@ export interface QuoteRequest {
   }>;
   outputTokens: Array<{
     tokenAddress: string;
-    proportion: number;
+    proportion?: number;  // For exact-input swaps
+    amount?: string;      // For exact-output swaps
   }>;
   userAddr: string;
   slippageLimitPercent: number;

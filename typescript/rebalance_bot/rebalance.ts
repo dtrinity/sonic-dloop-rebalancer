@@ -1,4 +1,10 @@
 import { BotConfig, RebalanceQuote, RebalanceResult } from "../../config/types";
+import { 
+  FLASH_LOAN_SAFETY_DIVISOR,
+  PERCENTAGE_PRECISION,
+  DEFAULT_TX_RETRY_ATTEMPTS,
+  RETRY_BASE_DELAY_MS
+} from "../../config/constants";
 import { logger } from "../common/log";
 import { formatTokenAmountWithSymbol } from "../common/erc20";
 import { ContractManager } from "./contracts";
@@ -88,6 +94,15 @@ export class RebalanceManager {
           `Trying rebalance with ${(percentage * 100).toFixed(0)}% of input amount`,
         );
 
+        // Per-trial subsidy check
+        const subsidyOk = await this.quoteManager.checkTrialSubsidyGate(quote, percentage);
+        if (!subsidyOk) {
+          logger.debug(
+            `Trial subsidy below threshold for ${(percentage * 100).toFixed(0)}% trial`,
+          );
+          continue;
+        }
+
         // Pre-flight flash loan check
         if (!(await this.checkFlashLoanAvailability(quote, trialAmount))) {
           logger.warn(
@@ -146,8 +161,8 @@ export class RebalanceManager {
   }
 
   private calculateTrialAmount(inputAmount: bigint, percentage: number): bigint {
-    const scaledPercentage = BigInt(Math.round(percentage * 1000000)); // 6 decimal places
-    return (inputAmount * scaledPercentage) / 1000000n;
+    const scaledPercentage = BigInt(Math.round(percentage * Number(PERCENTAGE_PRECISION)));
+    return (inputAmount * scaledPercentage) / PERCENTAGE_PRECISION;
   }
 
   private async checkFlashLoanAvailability(
@@ -177,7 +192,7 @@ export class RebalanceManager {
 
       const maxFlashLoan =
         await this.contracts.flashLender.maxFlashLoan(debtTokenAddress);
-      const maxAllowed = maxFlashLoan / 10n; // Periphery uses 1/10 of max
+      const maxAllowed = maxFlashLoan / FLASH_LOAN_SAFETY_DIVISOR;
 
       const available = requiredFlashAmount <= maxAllowed;
       if (!available) {
@@ -189,9 +204,56 @@ export class RebalanceManager {
 
       return available;
     } catch (error) {
-      logger.warn("Flash loan precheck failed:", error);
-      return true; // Allow trial to proceed if precheck fails
+      logger.error("Flash loan availability check failed:", {
+        error: error instanceof Error ? error.message : String(error),
+        quote: {
+          direction: quote.direction,
+          inputAmount: quote.inputTokenAmount.toString()
+        },
+        trialAmount: trialAmount.toString()
+      });
+      return false; // Fail safe: skip trial if precheck fails
     }
+  }
+
+  private async retryTransaction(
+    operation: () => Promise<any>,
+    operationName: string,
+    maxRetries: number = DEFAULT_TX_RETRY_ATTEMPTS
+  ): Promise<any> {
+    let lastError: Error | null = null;
+
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error instanceof Error ? error : new Error(String(error));
+        
+        // Check if error is retryable
+        const errorMessage = lastError.message.toLowerCase();
+        const isRetryable = 
+          errorMessage.includes('nonce too low') ||
+          errorMessage.includes('replacement transaction underpriced') ||
+          errorMessage.includes('rate limit') ||
+          errorMessage.includes('timeout') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('server error');
+
+        if (!isRetryable || attempt === maxRetries) {
+          throw lastError;
+        }
+
+        const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        logger.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`, {
+          error: lastError.message,
+          attempt
+        });
+        
+        await new Promise(resolve => setTimeout(resolve, delay));
+      }
+    }
+
+    throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`);
   }
 
   private async executeTrial(
@@ -217,46 +279,56 @@ export class RebalanceManager {
     }
 
     try {
-      let tx;
+      const maxRetries = this.config.policy.maxTxRetriesPerTrial;
+      
+      const tx = await this.retryTransaction(async () => {
+        if (quote.direction === 1) {
+          // Increase leverage
+          logger.info("Executing increase leverage", {
+            amount: formatTokenAmountWithSymbol(
+              trialAmount,
+              this.config.tokens.collateral.decimals,
+              this.config.tokens.collateral.symbol,
+            ),
+          });
 
-      if (quote.direction === 1) {
-        // Increase leverage
-        logger.info("Executing increase leverage", {
-          amount: formatTokenAmountWithSymbol(
+          return await this.contracts.increaseOdos.increaseLeverage(
             trialAmount,
-            this.config.tokens.collateral.decimals,
-            this.config.tokens.collateral.symbol,
-          ),
-        });
+            swapData,
+            this.config.contracts.dloopCore,
+          );
+        } else {
+          // Decrease leverage
+          logger.info("Executing decrease leverage", {
+            amount: formatTokenAmountWithSymbol(
+              trialAmount,
+              this.config.tokens.debt.decimals,
+              this.config.tokens.debt.symbol,
+            ),
+          });
 
-        tx = await (this.contracts.increaseOdos as any).increaseLeverage(
-          trialAmount,
-          swapData,
-          this.config.contracts.dloopCore,
-        );
-      } else {
-        // Decrease leverage
-        logger.info("Executing decrease leverage", {
-          amount: formatTokenAmountWithSymbol(
+          return await this.contracts.decreaseOdos.decreaseLeverage(
             trialAmount,
-            this.config.tokens.debt.decimals,
-            this.config.tokens.debt.symbol,
-          ),
-        });
+            swapData,
+            this.config.contracts.dloopCore,
+          );
+        }
+      }, `${quote.direction === 1 ? 'increaseLeverage' : 'decreaseLeverage'} transaction`, maxRetries);
 
-        tx = await (this.contracts.decreaseOdos as any).decreaseLeverage(
-          trialAmount,
-          swapData,
-          this.config.contracts.dloopCore,
-        );
-      }
-
-      const txHash: string = (tx as any).hash ?? (tx?.toString?.() || "");
+      const txHash: string = tx.hash ?? "";
       logger.info(`Transaction submitted: ${txHash}`);
-      const receipt = await (tx as any).wait?.();
+      
+      const receipt = await this.retryTransaction(async () => {
+        const receipt = await tx.wait();
+        if (!receipt) {
+          throw new Error("Transaction receipt is null");
+        }
+        return receipt;
+      }, "transaction receipt", maxRetries);
 
-      if (!receipt) {
-        throw new Error("Transaction receipt is null");
+      // Check transaction status
+      if (receipt.status !== 1) {
+        throw new Error(`Transaction failed with status: ${receipt.status}`);
       }
 
       logger.info(`Transaction confirmed in block ${receipt.blockNumber}`);

@@ -1,4 +1,8 @@
 import { BotConfig, RebalanceQuote } from "../../config/types";
+import {
+  getSlippageLimitBps,
+  getMaxPriceImpactBps
+} from "../../config/constants";
 import { logger } from "../common/log";
 import { formatTokenAmount } from "../common/erc20";
 import { OdosClient } from "../odos/client";
@@ -46,6 +50,22 @@ export class SwapDataBuilder {
     }
   }
 
+  private validatePriceImpact(priceImpact: number): void {
+    const maxPriceImpactBps = getMaxPriceImpactBps();
+    const priceImpactBps = Math.abs(priceImpact) * 10000; // Convert to basis points
+
+    if (priceImpactBps > maxPriceImpactBps) {
+      throw new Error(
+        `Price impact too high: ${priceImpactBps / 100}% > ${maxPriceImpactBps / 100}%`
+      );
+    }
+
+    logger.debug("Price impact check passed:", {
+      priceImpact: `${priceImpactBps / 100}%`,
+      maxAllowed: `${maxPriceImpactBps / 100}%`
+    });
+  }
+
   private async buildIncreaseSwapData(
     collateralAmountOut: bigint,
     userAddress: string,
@@ -60,7 +80,7 @@ export class SwapDataBuilder {
       this.config.tokens.collateral.decimals,
     );
 
-    // Estimate required debt input (with buffer for slippage)
+    // Estimate required debt input for the high input cap
     const collateralInBase =
       await this.contracts.core.convertFromTokenAmountToBaseCurrency(
         collateralAmountOut,
@@ -72,18 +92,18 @@ export class SwapDataBuilder {
         this.config.tokens.debt.address,
       );
 
-    // Add 5% buffer for slippage
-    const debtInputWithBuffer = (estimatedDebtInput * 105n) / 100n;
-    const debtInputFormatted = formatTokenAmount(
-      debtInputWithBuffer,
+    // Set a high input cap (150% of estimated) to ensure we have enough for exact-output
+    const debtInputCap = (estimatedDebtInput * 150n) / 100n;
+    const debtInputCapFormatted = formatTokenAmount(
+      debtInputCap,
       this.config.tokens.debt.decimals,
     );
 
-    logger.debug("Odos quote request for increase:", {
+    logger.debug("Odos exact-output quote request for increase:", {
       inputToken: this.config.tokens.debt.symbol,
-      inputAmount: debtInputFormatted,
+      inputCap: debtInputCapFormatted,
       outputToken: this.config.tokens.collateral.symbol,
-      outputAmount: collateralAmountOutFormatted,
+      exactOutputAmount: collateralAmountOutFormatted,
     });
 
     const quoteRequest = {
@@ -91,20 +111,23 @@ export class SwapDataBuilder {
       inputTokens: [
         {
           tokenAddress: this.config.tokens.debt.address,
-          amount: debtInputWithBuffer.toString(),
+          amount: debtInputCap.toString(),
         },
       ],
       outputTokens: [
         {
           tokenAddress: this.config.tokens.collateral.address,
-          proportion: 1,
+          amount: collateralAmountOut.toString(), // Exact output amount
         },
       ],
       userAddr: userAddress,
-      slippageLimitPercent: 1, // 1% slippage limit
+      slippageLimitPercent: getSlippageLimitBps() / 100, // Convert basis points to percentage
     };
 
     const quote = await this.odosClient.getQuote(quoteRequest);
+
+    // Validate price impact
+    this.validatePriceImpact(quote.priceImpact);
 
     const assembleRequest = {
       userAddr: userAddress,
@@ -138,7 +161,7 @@ export class SwapDataBuilder {
       this.config.tokens.debt.decimals,
     );
 
-    // Estimate required collateral input (with buffer)
+    // Estimate required collateral input for the input cap
     const debtInBase =
       await this.contracts.core.convertFromTokenAmountToBaseCurrency(
         totalDebtNeeded,
@@ -150,18 +173,18 @@ export class SwapDataBuilder {
         this.config.tokens.collateral.address,
       );
 
-    // Add 5% buffer for slippage
-    const collateralInputWithBuffer = (estimatedCollateralInput * 105n) / 100n;
-    const collateralInputFormatted = formatTokenAmount(
-      collateralInputWithBuffer,
+    // Set a high input cap (150% of estimated) to ensure we have enough for exact-output
+    const collateralInputCap = (estimatedCollateralInput * 150n) / 100n;
+    const collateralInputCapFormatted = formatTokenAmount(
+      collateralInputCap,
       this.config.tokens.collateral.decimals,
     );
 
-    logger.debug("Odos quote request for decrease:", {
+    logger.debug("Odos exact-output quote request for decrease:", {
       inputToken: this.config.tokens.collateral.symbol,
-      inputAmount: collateralInputFormatted,
+      inputCap: collateralInputCapFormatted,
       outputToken: this.config.tokens.debt.symbol,
-      outputAmount: totalDebtNeededFormatted,
+      exactOutputAmount: totalDebtNeededFormatted,
       flashFee: formatTokenAmount(flashFee, this.config.tokens.debt.decimals),
     });
 
@@ -170,20 +193,23 @@ export class SwapDataBuilder {
       inputTokens: [
         {
           tokenAddress: this.config.tokens.collateral.address,
-          amount: collateralInputWithBuffer.toString(),
+          amount: collateralInputCap.toString(),
         },
       ],
       outputTokens: [
         {
           tokenAddress: this.config.tokens.debt.address,
-          proportion: 1,
+          amount: totalDebtNeeded.toString(), // Exact output amount
         },
       ],
       userAddr: userAddress,
-      slippageLimitPercent: 1, // 1% slippage limit
+      slippageLimitPercent: getSlippageLimitBps() / 100, // Convert basis points to percentage
     };
 
     const quote = await this.odosClient.getQuote(quoteRequest);
+
+    // Validate price impact
+    this.validatePriceImpact(quote.priceImpact);
 
     const assembleRequest = {
       userAddr: userAddress,

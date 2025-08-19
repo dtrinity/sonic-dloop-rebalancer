@@ -1,5 +1,5 @@
 import { BotConfig, RebalanceQuote } from "../../config/types";
-import { ONE_HUNDRED_PERCENT_BPS } from "../../config/constants";
+import { ONE_HUNDRED_PERCENT_BPS, PERCENTAGE_PRECISION } from "../../config/constants";
 import { logger } from "../common/log";
 import { formatTokenAmountWithSymbol } from "../common/erc20";
 import { ContractManager } from "./contracts";
@@ -85,6 +85,63 @@ export class QuoteManager {
       return true;
     } catch (error) {
       logger.error("Failed to check subsidy gate:", error);
+      throw error;
+    }
+  }
+
+  async checkTrialSubsidyGate(
+    quote: RebalanceQuote,
+    percentage: number
+  ): Promise<boolean> {
+    try {
+      const subsidyBps = await this.contracts.core.getCurrentSubsidyBps();
+      
+      // Calculate trial output amount using the same precision as trial selection
+      const scaledPercentage = BigInt(Math.round(percentage * Number(PERCENTAGE_PRECISION)));
+      const trialEstimatedOutput = (quote.estimatedOutputTokenAmount * scaledPercentage) / PERCENTAGE_PRECISION;
+      
+      const trialSubsidy = (trialEstimatedOutput * subsidyBps) / BigInt(ONE_HUNDRED_PERCENT_BPS);
+
+      // Determine output token based on direction
+      const outputToken =
+        quote.direction === 1
+          ? this.config.tokens.debt
+          : this.config.tokens.collateral;
+      const minSubsidyStr =
+        this.config.policy.minSubsidyAmount[outputToken.address];
+
+      if (!minSubsidyStr) {
+        logger.warn(
+          `No minimum subsidy configured for ${outputToken.symbol}, allowing trial`,
+        );
+        return true;
+      }
+
+      const minSubsidy = BigInt(minSubsidyStr);
+
+      logger.debug("Trial subsidy check:", {
+        percentage: `${(percentage * 100).toFixed(1)}%`,
+        trialSubsidy: formatTokenAmountWithSymbol(
+          trialSubsidy,
+          outputToken.decimals,
+          outputToken.symbol,
+        ),
+        minimumRequired: formatTokenAmountWithSymbol(
+          minSubsidy,
+          outputToken.decimals,
+          outputToken.symbol,
+        ),
+        subsidyBps: subsidyBps.toString(),
+      });
+
+      if (trialSubsidy < minSubsidy) {
+        logger.debug(`Trial subsidy below minimum threshold for ${(percentage * 100).toFixed(1)}%`);
+        return false;
+      }
+
+      return true;
+    } catch (error) {
+      logger.error("Failed to check trial subsidy gate:", error);
       throw error;
     }
   }

@@ -1,12 +1,37 @@
 import { ethers } from "ethers";
 import { BotConfig } from "../../config/types";
 
-// Use untyped ethers.Contract instances to avoid type issues without typechain.
-// Call sites will cast to `any` for specific method invocations.
-export type DLoopCoreContract = ethers.Contract;
-export type IncreaseLeverageContract = ethers.Contract;
-export type DecreaseLeverageContract = ethers.Contract;
-export type FlashLenderContract = ethers.Contract;
+// Typed contract interfaces for better type safety
+export interface DLoopCoreContract extends ethers.Contract {
+  quoteRebalanceAmountToReachTargetLeverage(): Promise<[bigint, bigint, number]>;
+  getCurrentSubsidyBps(): Promise<bigint>;
+  getCurrentLeverageBps(): Promise<bigint>;
+  collateralToken(): Promise<string>;
+  debtToken(): Promise<string>;
+  convertFromTokenAmountToBaseCurrency(amount: bigint, token: string): Promise<bigint>;
+  convertFromBaseCurrencyToToken(amount: bigint, token: string): Promise<bigint>;
+}
+
+export interface IncreaseLeverageContract extends ethers.Contract {
+  increaseLeverage(
+    rebalanceCollateralAmount: bigint,
+    swapData: string,
+    dLoopCore: string
+  ): Promise<ethers.ContractTransactionResponse>;
+}
+
+export interface DecreaseLeverageContract extends ethers.Contract {
+  decreaseLeverage(
+    rebalanceDebtAmount: bigint,
+    swapData: string,
+    dLoopCore: string
+  ): Promise<ethers.ContractTransactionResponse>;
+}
+
+export interface FlashLenderContract extends ethers.Contract {
+  maxFlashLoan(token: string): Promise<bigint>;
+  flashFee(token: string, amount: bigint): Promise<bigint>;
+}
 
 export class ContractManager {
   public readonly core: DLoopCoreContract;

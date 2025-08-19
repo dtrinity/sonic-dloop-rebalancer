@@ -4,14 +4,14 @@ export const sonicMainnetConfig: BotConfig = {
   network: {
     chainId: 146,
     rpcUrl: "https://rpc.soniclabs.com",
-    privateKey: "",
+    privateKey: process.env.PRIVATE_KEY || "",
   },
   contracts: {
-    dloopCore: "",
-    increaseOdos: "",
-    decreaseOdos: "",
-    odosRouter: "",
-    flashLender: "",
+    dloopCore: "", // TODO: add mainnet address
+    increaseOdos: "", // TODO: add mainnet address
+    decreaseOdos: "", // TODO: add mainnet address
+    odosRouter: "", // TODO: add mainnet address
+    flashLender: "", // TODO: add mainnet address
   },
   tokens: {
     collateral: {
