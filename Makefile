@@ -51,10 +51,6 @@ env-example: ## Create example environment file
 	@echo "# Private key (required)" >> .env.example
 	@echo "PRIVATE_KEY=" >> .env.example
 	@echo "" >> .env.example
-	@echo "# Optional: Minimum subsidy overrides (base units)" >> .env.example
-	@echo "MIN_SUBSIDY_COLLATERAL=" >> .env.example
-	@echo "MIN_SUBSIDY_DEBT=" >> .env.example
-	@echo "" >> .env.example
 	@echo "# Optional: Dry run (must be 'true', 'false', or empty)" >> .env.example
 	@echo "DRY_RUN=" >> .env.example
 	@echo "" >> .env.example

@@ -35,5 +35,3 @@ reports/slither/
 
 # Mythril analysis reports
 reports/mythril/
-
-.env.*
