@@ -73,11 +73,11 @@ export class RebalanceManager {
         i === this.config.policy.rebalancePercentageList.length - 1;
 
       try {
-        const trialInput = this.calculateTrialInput(
+        const trialAmount = this.calculateTrialAmount(
           quote.inputTokenAmount,
           percentage,
         );
-        if (trialInput === 0n) {
+        if (trialAmount === 0n) {
           logger.debug(
             `Skipping ${(percentage * 100).toFixed(0)}% trial - input amount is 0`,
           );
@@ -89,7 +89,7 @@ export class RebalanceManager {
         );
 
         // Pre-flight flash loan check
-        if (!(await this.checkFlashLoanAvailability(quote, trialInput))) {
+        if (!(await this.checkFlashLoanAvailability(quote, trialAmount))) {
           logger.warn(
             `Flash loan capacity exceeded for ${(percentage * 100).toFixed(0)}% trial`,
           );
@@ -99,14 +99,14 @@ export class RebalanceManager {
         // Build swap data
         const swapData = await this.swapDataBuilder.buildSwapData(
           quote,
-          trialInput,
+          trialAmount,
           userAddress,
         );
 
         // Execute the rebalance
         const result = await this.executeTrial(
           quote,
-          trialInput,
+          trialAmount,
           swapData,
           percentage,
         );
@@ -145,14 +145,14 @@ export class RebalanceManager {
     };
   }
 
-  private calculateTrialInput(inputAmount: bigint, percentage: number): bigint {
+  private calculateTrialAmount(inputAmount: bigint, percentage: number): bigint {
     const scaledPercentage = BigInt(Math.round(percentage * 1000000)); // 6 decimal places
     return (inputAmount * scaledPercentage) / 1000000n;
   }
 
   private async checkFlashLoanAvailability(
     quote: RebalanceQuote,
-    trialInput: bigint,
+    trialAmount: bigint,
   ): Promise<boolean> {
     try {
       const debtTokenAddress = this.config.tokens.debt.address;
@@ -162,7 +162,7 @@ export class RebalanceManager {
         // Increase: estimate required flash in debt for trialInput collateral
         const collateralInBase =
           await this.contracts.core.convertFromTokenAmountToBaseCurrency(
-            trialInput,
+            trialAmount,
             this.config.tokens.collateral.address,
           );
         requiredFlashAmount =
@@ -172,7 +172,7 @@ export class RebalanceManager {
           );
       } else {
         // Decrease: required flash equals trialInput debt
-        requiredFlashAmount = trialInput;
+        requiredFlashAmount = trialAmount;
       }
 
       const maxFlashLoan =
@@ -196,7 +196,7 @@ export class RebalanceManager {
 
   private async executeTrial(
     quote: RebalanceQuote,
-    trialInput: bigint,
+    trialAmount: bigint,
     swapData: string,
     percentage: number,
   ): Promise<RebalanceResult> {
@@ -204,13 +204,13 @@ export class RebalanceManager {
       logger.info("DRY RUN: Would execute rebalance", {
         direction: quote.direction,
         percentage: (percentage * 100).toFixed(0) + "%",
-        trialInput: trialInput.toString(),
+        trialInput: trialAmount.toString(),
       });
       return {
         success: true,
         direction: quote.direction,
         percentage,
-        inputAmount: trialInput,
+        inputAmount: trialAmount,
         txHash:
           "0x0000000000000000000000000000000000000000000000000000000000000000",
       };
@@ -223,14 +223,14 @@ export class RebalanceManager {
         // Increase leverage
         logger.info("Executing increase leverage", {
           amount: formatTokenAmountWithSymbol(
-            trialInput,
+            trialAmount,
             this.config.tokens.collateral.decimals,
             this.config.tokens.collateral.symbol,
           ),
         });
 
         tx = await (this.contracts.increaseOdos as any).increaseLeverage(
-          trialInput,
+          trialAmount,
           swapData,
           this.config.contracts.dloopCore,
         );
@@ -238,14 +238,14 @@ export class RebalanceManager {
         // Decrease leverage
         logger.info("Executing decrease leverage", {
           amount: formatTokenAmountWithSymbol(
-            trialInput,
+            trialAmount,
             this.config.tokens.debt.decimals,
             this.config.tokens.debt.symbol,
           ),
         });
 
         tx = await (this.contracts.decreaseOdos as any).decreaseLeverage(
-          trialInput,
+          trialAmount,
           swapData,
           this.config.contracts.dloopCore,
         );
@@ -265,7 +265,7 @@ export class RebalanceManager {
         success: true,
         direction: quote.direction,
         percentage,
-        inputAmount: trialInput,
+        inputAmount: trialAmount,
         txHash: receipt.hash ?? txHash,
         gasUsed: receipt.gasUsed,
       };
@@ -276,7 +276,7 @@ export class RebalanceManager {
         success: false,
         direction: quote.direction,
         percentage,
-        inputAmount: trialInput,
+        inputAmount: trialAmount,
         error: errorMessage,
       };
     }

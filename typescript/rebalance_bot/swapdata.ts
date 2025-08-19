@@ -19,7 +19,7 @@ export class SwapDataBuilder {
 
   async buildSwapData(
     quote: RebalanceQuote,
-    trialInputAmount: bigint,
+    trialRebalanceAmount: bigint,
     userAddress: string,
   ): Promise<string> {
     if (!this.config.contracts.odosRouter) {
@@ -29,10 +29,16 @@ export class SwapDataBuilder {
     try {
       if (quote.direction === 1) {
         // Increase leverage: swap debt -> collateral (exact out)
-        return await this.buildIncreaseSwapData(trialInputAmount, userAddress);
+        return await this.buildIncreaseSwapData(
+          trialRebalanceAmount,
+          userAddress,
+        );
       } else {
         // Decrease leverage: swap collateral -> debt (exact out, including flash fee)
-        return await this.buildDecreaseSwapData(trialInputAmount, userAddress);
+        return await this.buildDecreaseSwapData(
+          trialRebalanceAmount,
+          userAddress,
+        );
       }
     } catch (error) {
       logger.error("Failed to build swap data:", error);
