@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access -- tests stub runtime values */
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import sinon from "sinon";
@@ -406,3 +407,5 @@ describe("SwapDataBuilder", function () {
     });
   });
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-member-access -- re-enable after tests */

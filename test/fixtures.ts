@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment -- fixtures create runtime objects from mocks */
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
 import { ethers } from "hardhat";
 
@@ -105,3 +106,5 @@ export async function deployTestFixture(): Promise<TestFixture> {
     config,
   };
 }
+
+/* eslint-enable @typescript-eslint/no-unsafe-assignment -- re-enable after fixtures */

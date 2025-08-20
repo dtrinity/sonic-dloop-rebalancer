@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- tests stub third-party libs and intentionally use any types */
 import { WebClient } from "@slack/web-api";
 import { expect } from "chai";
 import sinon from "sinon";
@@ -378,3 +379,5 @@ describe("NotificationManager", function () {
     });
   });
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- re-enable after tests */

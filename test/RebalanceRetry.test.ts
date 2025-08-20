@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- tests use many sinon stubs and `any` values; relaxing these type rules in tests for readability */
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import sinon from "sinon";
@@ -246,3 +247,5 @@ describe("RebalanceRetry", function () {
     });
   });
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- re-enable after tests */

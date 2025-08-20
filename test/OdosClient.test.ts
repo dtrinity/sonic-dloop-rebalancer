@@ -1,4 +1,5 @@
 import axios from "axios";
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- tests stub axios and use any values */
 import { expect } from "chai";
 import sinon from "sinon";
 
@@ -288,3 +289,5 @@ describe("OdosClient", function () {
     });
   });
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- re-enable after tests */

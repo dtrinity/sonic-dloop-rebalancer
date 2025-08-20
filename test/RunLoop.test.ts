@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- tests use sinon stubs and runtime any values */
 import { expect } from "chai";
 import sinon from "sinon";
 
@@ -227,3 +228,5 @@ describe("RunLoop", function () {
     });
   });
 });
+
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access -- re-enable after tests */
