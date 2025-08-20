@@ -1,4 +1,4 @@
-/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- tests use many sinon stubs and `any` values; relaxing these type rules in tests for readability */
+/* eslint-disable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- tests use many sinon stubs and `any` values; relaxing these type rules in tests for readability */
 import { expect } from "chai";
 import { ethers } from "hardhat";
 import sinon from "sinon";
@@ -85,7 +85,7 @@ describe("RebalanceRetry", function () {
       try {
         await retryTransaction(mockOperation, "test operation", 3);
         expect.fail("Should have thrown after max retries");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.include("ECONNREFUSED");
         expect(callCount).to.equal(3); // All 3 attempts made
       }
@@ -106,7 +106,7 @@ describe("RebalanceRetry", function () {
       try {
         await retryTransaction(mockOperation, "test operation", 3);
         expect.fail("Should have thrown immediately");
-      } catch (error) {
+      } catch (error: any) {
         expect(error.message).to.equal("Invalid transaction");
         expect(callCount).to.equal(1); // Only one attempt made
       }
@@ -123,8 +123,8 @@ describe("RebalanceRetry", function () {
       // Mock setTimeout to capture delays
       const setTimeoutStub = sinon
         .stub(global, "setTimeout")
-        .callsFake((callback: any, delay: number) => {
-          delays.push(delay);
+        .callsFake((callback: (_: void) => void, delay: number | undefined) => {
+          delays.push(delay ?? 0);
           return originalSetTimeout(callback, 0); // Execute immediately for test
         });
 
@@ -248,4 +248,4 @@ describe("RebalanceRetry", function () {
   });
 });
 
-/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-argument -- re-enable after tests */
+/* eslint-enable @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment -- re-enable after tests */

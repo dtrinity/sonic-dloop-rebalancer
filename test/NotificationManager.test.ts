@@ -121,7 +121,10 @@ describe("NotificationManager", function () {
 
     it("should work without Slack configuration", async function () {
       const configWithoutSlack = { ...mockConfig };
-      configWithoutSlack.notifications.slack = undefined;
+      configWithoutSlack.notifications.slack = {
+        token: "",
+        channel: "",
+      };
 
       const notificationManagerNoSlack = new NotificationManager(
         configWithoutSlack,
