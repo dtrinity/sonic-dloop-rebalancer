@@ -1,7 +1,8 @@
 import { getConfig } from "../../config/config";
 import { IGNORE_DURATION_MS } from "../../config/constants";
-import { logger } from "../common/log";
 import { FileCache } from "../common/cache";
+import { logger } from "../common/log";
+import { sanitizeError } from "../common/sanitize";
 import { ContractManager } from "./contracts";
 import { RebalanceManager } from "./rebalance";
 
@@ -87,6 +88,7 @@ class RebalanceBotRunner {
 
   private shouldIgnoreCycle(): boolean {
     const ignoreData = this.ignoreCache.load<{ [key: string]: IgnoreEntry }>();
+
     if (!ignoreData) {
       return false;
     }
@@ -132,6 +134,11 @@ class RebalanceBotRunner {
 }
 
 // Main entry point
+/**
+ * Start the Rebalance bot: initialize resources and run the main loop.
+ * This function is the primary entry point when the module is executed
+ * directly (`node run.js`). It will start the bot and block until stopped.
+ */
 async function main(): Promise<void> {
   const bot = new RebalanceBotRunner();
 
@@ -148,13 +155,16 @@ async function main(): Promise<void> {
 
   // Handle unhandled promise rejections
   process.on("unhandledRejection", (reason, promise) => {
+    const errorMessage =
+      reason instanceof Error ? reason.message : String(reason);
     logger.error("Unhandled promise rejection:", {
-      reason: reason instanceof Error ? reason.message : String(reason),
+      reason: sanitizeError(reason),
       stack: reason instanceof Error ? reason.stack : undefined,
-      promise: promise.toString()
+      promise: promise.toString(),
     });
+
     // Don't exit immediately - let the bot continue running unless it's a critical error
-    if (reason instanceof Error && reason.message.includes("ECONNREFUSED")) {
+    if (reason instanceof Error && errorMessage.includes("ECONNREFUSED")) {
       logger.error("Critical connection error detected, stopping bot");
       bot.stop();
     }
@@ -163,8 +173,8 @@ async function main(): Promise<void> {
   // Handle uncaught exceptions
   process.on("uncaughtException", (error) => {
     logger.error("Uncaught exception:", {
-      message: error.message,
-      stack: error.stack
+      message: sanitizeError(error),
+      stack: error.stack,
     });
     logger.error("Shutting down due to uncaught exception");
     bot.stop();

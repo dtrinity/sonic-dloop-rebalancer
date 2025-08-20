@@ -1,8 +1,9 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { deployTestFixture, TestFixture } from "./fixtures";
+
 import { ContractManager } from "../typescript/rebalance_bot/contracts";
 import { QuoteManager } from "../typescript/rebalance_bot/quote";
+import { deployTestFixture, TestFixture } from "./fixtures";
 
 describe("QuoteManager", function () {
   let fixture: TestFixture;
@@ -11,7 +12,7 @@ describe("QuoteManager", function () {
 
   beforeEach(async function () {
     fixture = await deployTestFixture();
-    
+
     const provider = ethers.provider;
     const signer = fixture.deployer;
     contractManager = new ContractManager(provider, signer, fixture.config);
@@ -24,14 +25,16 @@ describe("QuoteManager", function () {
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("10"), // input: 10 WETH
         ethers.parseEther("20000"), // output: 20000 dUSD
-        1 // direction: increase
+        1, // direction: increase
       );
 
       const quote = await quoteManager.getRebalanceQuote();
-      
+
       expect(quote).to.not.be.null;
       expect(quote!.inputTokenAmount).to.equal(ethers.parseEther("10"));
-      expect(quote!.estimatedOutputTokenAmount).to.equal(ethers.parseEther("20000"));
+      expect(quote!.estimatedOutputTokenAmount).to.equal(
+        ethers.parseEther("20000"),
+      );
       expect(quote!.direction).to.equal(1);
     });
 
@@ -40,7 +43,7 @@ describe("QuoteManager", function () {
       await fixture.dloopCore.setMockQuote(
         0, // input: 0
         0, // output: 0
-        0  // direction: no rebalancing
+        0, // direction: no rebalancing
       );
 
       const quote = await quoteManager.getRebalanceQuote();
@@ -52,7 +55,7 @@ describe("QuoteManager", function () {
       await fixture.dloopCore.setMockQuote(
         0, // input: 0
         ethers.parseEther("1000"), // output: 1000 dUSD
-        1  // direction: increase
+        1, // direction: increase
       );
 
       const quote = await quoteManager.getRebalanceQuote();
@@ -103,7 +106,10 @@ describe("QuoteManager", function () {
       const configWithoutMinSubsidy = { ...fixture.config };
       configWithoutMinSubsidy.policy.minSubsidyAmount = {};
 
-      const quoteManagerWithoutMin = new QuoteManager(contractManager, configWithoutMinSubsidy);
+      const quoteManagerWithoutMin = new QuoteManager(
+        contractManager,
+        configWithoutMinSubsidy,
+      );
 
       const quote = {
         inputTokenAmount: ethers.parseEther("10"),

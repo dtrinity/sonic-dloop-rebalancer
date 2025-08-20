@@ -1,6 +1,7 @@
+import axios from "axios";
 import { expect } from "chai";
 import sinon from "sinon";
-import axios, { AxiosError } from "axios";
+
 import { OdosClient } from "../typescript/odos/client";
 
 describe("OdosClient", function () {
@@ -12,8 +13,8 @@ describe("OdosClient", function () {
     const mockAxiosInstance = {
       post: sinon.stub(),
     };
-    
-    axiosStub = sinon.stub(axios, 'create').returns(mockAxiosInstance as any);
+
+    axiosStub = sinon.stub(axios, "create").returns(mockAxiosInstance as any);
     odosClient = new OdosClient("https://api.odos.xyz", 146);
   });
 
@@ -87,14 +88,15 @@ describe("OdosClient", function () {
 
       const mockAxiosInstance = axios.create() as any;
       let callCount = 0;
-      
+
       // First call fails with retryable error, second succeeds
       mockAxiosInstance.post = sinon.stub().callsFake(() => {
         callCount++;
+
         if (callCount === 1) {
           const error = new Error("Network Error");
           (error as any).isAxiosError = true;
-          (error as any).code = 'ECONNRESET';
+          (error as any).code = "ECONNRESET";
           return Promise.reject(error);
         } else {
           return Promise.resolve(mockResponse);
@@ -120,10 +122,10 @@ describe("OdosClient", function () {
 
     it("should fail after max retries", async function () {
       const mockAxiosInstance = axios.create() as any;
-      
+
       const error = new Error("Server Error");
       (error as any).isAxiosError = true;
-      (error as any).code = 'ECONNRESET';
+      (error as any).code = "ECONNRESET";
       mockAxiosInstance.post = sinon.stub().rejects(error);
 
       axiosStub.returns(mockAxiosInstance);
@@ -137,7 +139,9 @@ describe("OdosClient", function () {
         slippageLimitPercent: 1,
       };
 
-      await expect(odosClient.getQuote(quoteRequest)).to.be.rejectedWith("Server Error");
+      await expect(odosClient.getQuote(quoteRequest)).to.be.rejectedWith(
+        "Server Error",
+      );
       expect(mockAxiosInstance.post.callCount).to.equal(3); // Initial + 2 retries
     });
 
@@ -151,7 +155,7 @@ describe("OdosClient", function () {
       };
 
       await expect(odosClient.getQuote(quoteRequest)).to.be.rejectedWith(
-        "Chain ID mismatch. Expected 146, got 1"
+        "Chain ID mismatch. Expected 146, got 1",
       );
     });
 
@@ -177,7 +181,7 @@ describe("OdosClient", function () {
       };
 
       await expect(odosClient.getQuote(quoteRequest)).to.be.rejectedWith(
-        "Invalid response from ODOS API: Missing required fields"
+        "Invalid response from ODOS API: Missing required fields",
       );
     });
   });
@@ -265,8 +269,10 @@ describe("OdosClient", function () {
         simulate: true,
       };
 
-      await expect(odosClient.assembleTransaction(assembleRequest)).to.be.rejectedWith(
-        "Transaction simulation failed: INSUFFICIENT_OUTPUT - Insufficient output amount"
+      await expect(
+        odosClient.assembleTransaction(assembleRequest),
+      ).to.be.rejectedWith(
+        "Transaction simulation failed: INSUFFICIENT_OUTPUT - Insufficient output amount",
       );
     });
   });
@@ -276,8 +282,8 @@ describe("OdosClient", function () {
       // Test that axios.create is called with timeout
       expect(axiosStub.calledOnce).to.be.true;
       const createCall = axiosStub.getCall(0);
-      expect(createCall.args[0]).to.have.property('timeout');
-      expect(createCall.args[0].timeout).to.be.a('number');
+      expect(createCall.args[0]).to.have.property("timeout");
+      expect(createCall.args[0].timeout).to.be.a("number");
       expect(createCall.args[0].timeout).to.be.greaterThan(0);
     });
   });

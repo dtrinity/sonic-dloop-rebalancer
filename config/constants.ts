@@ -21,6 +21,11 @@ export const DEFAULT_HTTP_TIMEOUT_MS = 10_000; // 10 seconds
 export const DEFAULT_TX_RETRY_ATTEMPTS = 3;
 export const RETRY_BASE_DELAY_MS = 1000; // Base delay for exponential backoff
 
+// Exact-output swap input cap (basis points over estimated input)
+// Trade-off: Higher values provide more routing flexibility but increase slippage risk
+// Valid range: 10000-50000 (100%-500%)
+export const DEFAULT_EXACT_OUT_INPUT_CAP_BPS = 15000; // 150%
+
 // Environment variable overrides
 export function getSlippageLimitBps(): number {
   const envValue = process.env.SLIPPAGE_LIMIT_BPS;
@@ -53,4 +58,15 @@ export function getHttpTimeoutMs(): number {
     }
   }
   return DEFAULT_HTTP_TIMEOUT_MS;
+}
+
+export function getExactOutInputCapBps(): number {
+  const envValue = process.env.EXACT_OUT_INPUT_CAP_BPS;
+  if (envValue) {
+    const parsed = parseInt(envValue, 10);
+    if (!isNaN(parsed) && parsed >= 10000 && parsed <= 50000) {
+      return parsed;
+    }
+  }
+  return DEFAULT_EXACT_OUT_INPUT_CAP_BPS;
 }

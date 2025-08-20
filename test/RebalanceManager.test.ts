@@ -1,8 +1,9 @@
 import { expect } from "chai";
 import { ethers } from "hardhat";
-import { deployTestFixture, TestFixture } from "./fixtures";
+
 import { ContractManager } from "../typescript/rebalance_bot/contracts";
 import { RebalanceManager } from "../typescript/rebalance_bot/rebalance";
+import { deployTestFixture, TestFixture } from "./fixtures";
 
 describe("RebalanceManager", function () {
   let fixture: TestFixture;
@@ -11,7 +12,7 @@ describe("RebalanceManager", function () {
 
   beforeEach(async function () {
     fixture = await deployTestFixture();
-    
+
     const provider = ethers.provider;
     const signer = fixture.deployer;
     contractManager = new ContractManager(provider, signer, fixture.config);
@@ -32,7 +33,7 @@ describe("RebalanceManager", function () {
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("10"),
         ethers.parseEther("0.01"), // Very small output
-        1
+        1,
       );
 
       // Set subsidy to 1%
@@ -46,14 +47,14 @@ describe("RebalanceManager", function () {
       // Enable dry run
       const dryRunConfig = { ...fixture.config };
       dryRunConfig.policy.dryRun = true;
-      
+
       const dryRunManager = new RebalanceManager(contractManager, dryRunConfig);
 
       // Set up valid quote with good subsidy
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("10"),
         ethers.parseEther("20000"),
-        1
+        1,
       );
       await fixture.dloopCore.setMockSubsidyBps(100);
 
@@ -66,12 +67,12 @@ describe("RebalanceManager", function () {
     it("should skip trial when flash loan capacity is exceeded", async function () {
       // This is tested indirectly through executeRebalance
       // The actual flash loan precheck logic is in the private method
-      
+
       // Set up a quote that would require a large flash loan
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("1000000"), // Very large amount
         ethers.parseEther("2000000000"),
-        1
+        1,
       );
       await fixture.dloopCore.setMockSubsidyBps(100);
 
@@ -86,13 +87,13 @@ describe("RebalanceManager", function () {
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("10"),
         ethers.parseEther("20000"),
-        1
+        1,
       );
       await fixture.dloopCore.setMockSubsidyBps(100);
 
       // The actual fallback behavior is tested through integration
       // since we don't have real periphery contracts to fail/succeed
-      
+
       // Should complete without throwing
       await expect(rebalanceManager.executeRebalance()).to.not.be.reverted;
     });
@@ -104,9 +105,9 @@ describe("RebalanceManager", function () {
       await fixture.dloopCore.setMockQuote(
         ethers.parseEther("10"),
         ethers.parseEther("20000"),
-        1
+        1,
       );
-      
+
       // This should not throw even if internal calls fail
       await expect(rebalanceManager.executeRebalance()).to.not.be.reverted;
     });

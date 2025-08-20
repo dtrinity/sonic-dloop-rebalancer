@@ -1,12 +1,12 @@
 import axios, { AxiosInstance } from "axios";
 import { ethers } from "ethers";
-import { logger } from "../common/log";
+
 import {
   DEFAULT_RETRY_ATTEMPTS,
-  DEFAULT_HTTP_TIMEOUT_MS,
+  getHttpTimeoutMs,
   RETRY_BASE_DELAY_MS,
-  getHttpTimeoutMs
 } from "../../config/constants";
+import { logger } from "../common/log";
 import {
   AssembleRequest,
   AssembleResponse,
@@ -31,7 +31,7 @@ export class OdosClient {
       baseURL: baseUrl,
       timeout: getHttpTimeoutMs(),
       headers: {
-        'Content-Type': 'application/json',
+        "Content-Type": "application/json",
       },
     });
   }
@@ -39,7 +39,7 @@ export class OdosClient {
   private async retryRequest<T>(
     operation: () => Promise<T>,
     operationName: string,
-    maxRetries: number = DEFAULT_RETRY_ATTEMPTS
+    maxRetries: number = DEFAULT_RETRY_ATTEMPTS,
   ): Promise<T> {
     let lastError: Error | null = null;
 
@@ -48,32 +48,38 @@ export class OdosClient {
         return await operation();
       } catch (error) {
         lastError = error instanceof Error ? error : new Error(String(error));
-        
+
         // Check if error is retryable
-        const isRetryable = axios.isAxiosError(error) && (
-          !error.response ||
-          error.response.status >= 500 ||
-          error.response.status === 429 ||
-          error.code === 'ETIMEDOUT' ||
-          error.code === 'ECONNRESET' ||
-          error.code === 'ENOTFOUND'
-        );
+        const isRetryable =
+          axios.isAxiosError(error) &&
+          (!error.response ||
+            error.response.status >= 500 ||
+            error.response.status === 429 ||
+            error.code === "ETIMEDOUT" ||
+            error.code === "ECONNRESET" ||
+            error.code === "ENOTFOUND");
 
         if (!isRetryable || attempt === maxRetries) {
           throw lastError;
         }
 
         const delay = RETRY_BASE_DELAY_MS * Math.pow(2, attempt - 1);
-        logger.warn(`${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`, {
-          error: lastError.message,
-          attempt
-        });
-        
-        await new Promise(resolve => setTimeout(resolve, delay));
+        logger.warn(
+          `${operationName} failed (attempt ${attempt}/${maxRetries}), retrying in ${delay}ms:`,
+          {
+            error: lastError.message,
+            attempt,
+          },
+        );
+
+        await new Promise((resolve) => setTimeout(resolve, delay));
       }
     }
 
-    throw lastError || new Error(`${operationName} failed after ${maxRetries} attempts`);
+    throw (
+      lastError ||
+      new Error(`${operationName} failed after ${maxRetries} attempts`)
+    );
   }
 
   /**

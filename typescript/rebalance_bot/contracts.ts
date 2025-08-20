@@ -1,22 +1,31 @@
 import { ethers } from "ethers";
+
 import { BotConfig } from "../../config/types";
 
 // Typed contract interfaces for better type safety
 export interface DLoopCoreContract extends ethers.Contract {
-  quoteRebalanceAmountToReachTargetLeverage(): Promise<[bigint, bigint, number]>;
+  quoteRebalanceAmountToReachTargetLeverage(): Promise<
+    [bigint, bigint, number]
+  >;
   getCurrentSubsidyBps(): Promise<bigint>;
   getCurrentLeverageBps(): Promise<bigint>;
   collateralToken(): Promise<string>;
   debtToken(): Promise<string>;
-  convertFromTokenAmountToBaseCurrency(amount: bigint, token: string): Promise<bigint>;
-  convertFromBaseCurrencyToToken(amount: bigint, token: string): Promise<bigint>;
+  convertFromTokenAmountToBaseCurrency(
+    amount: bigint,
+    token: string,
+  ): Promise<bigint>;
+  convertFromBaseCurrencyToToken(
+    amount: bigint,
+    token: string,
+  ): Promise<bigint>;
 }
 
 export interface IncreaseLeverageContract extends ethers.Contract {
   increaseLeverage(
     rebalanceCollateralAmount: bigint,
     swapData: string,
-    dLoopCore: string
+    dLoopCore: string,
   ): Promise<ethers.ContractTransactionResponse>;
 }
 
@@ -24,7 +33,7 @@ export interface DecreaseLeverageContract extends ethers.Contract {
   decreaseLeverage(
     rebalanceDebtAmount: bigint,
     swapData: string,
-    dLoopCore: string
+    dLoopCore: string,
   ): Promise<ethers.ContractTransactionResponse>;
 }
 

@@ -1,5 +1,6 @@
 import fs from "fs";
 import path from "path";
+
 import { logger } from "./log";
 
 export class FileCache {
@@ -12,6 +13,7 @@ export class FileCache {
 
   private ensureStateDir(): void {
     const stateDir = path.dirname(this.filePath);
+
     if (!fs.existsSync(stateDir)) {
       fs.mkdirSync(stateDir, { recursive: true });
     }

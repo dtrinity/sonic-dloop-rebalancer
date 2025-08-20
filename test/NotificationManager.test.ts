@@ -1,8 +1,9 @@
+import { WebClient } from "@slack/web-api";
 import { expect } from "chai";
 import sinon from "sinon";
-import { WebClient } from "@slack/web-api";
-import { NotificationManager } from "../typescript/rebalance_bot/notification";
+
 import { RebalanceResult } from "../config/types";
+import { NotificationManager } from "../typescript/rebalance_bot/notification";
 
 describe("NotificationManager", function () {
   let webClientStub: sinon.SinonStubbedInstance<WebClient>;
@@ -58,9 +59,9 @@ describe("NotificationManager", function () {
       postMessage: sinon.stub().resolves({ ok: true }),
     };
 
-    consoleLogStub = sinon.stub(console, 'log');
-    consoleErrorStub = sinon.stub(console, 'error');
-    
+    consoleLogStub = sinon.stub(console, "log");
+    consoleErrorStub = sinon.stub(console, "error");
+
     // Create notification manager and inject the stubbed WebClient
     notificationManager = new NotificationManager(mockConfig);
     (notificationManager as any).slackClient = webClientStub;
@@ -86,14 +87,14 @@ describe("NotificationManager", function () {
 
       expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
       const call = (webClientStub.chat as any).postMessage.getCall(0);
-      
+
       const payload = call.args[0];
-      expect(payload.channel).to.equal('#test-channel');
-      expect(payload.text).to.include('Rebalanced'); // Check for success message
-      expect(payload.text).to.include('INC'); // Increase direction
-      expect(payload.text).to.include('80%'); // Percentage
-      expect(payload.text).to.include('5.0 WETH'); // Input amount formatted
-      expect(payload.text).to.include('0xabcdef1234567890'); // TX hash
+      expect(payload.channel).to.equal("#test-channel");
+      expect(payload.text).to.include("Rebalanced"); // Check for success message
+      expect(payload.text).to.include("INC"); // Increase direction
+      expect(payload.text).to.include("80%"); // Percentage
+      expect(payload.text).to.include("5.0 WETH"); // Input amount formatted
+      expect(payload.text).to.include("0xabcdef1234567890"); // TX hash
     });
 
     it("should handle Slack errors gracefully", async function () {
@@ -105,20 +106,25 @@ describe("NotificationManager", function () {
         txHash: "0xabcdef1234567890",
       };
 
-      (webClientStub.chat as any).postMessage.rejects(new Error('Slack API error'));
+      (webClientStub.chat as any).postMessage.rejects(
+        new Error("Slack API error"),
+      );
 
       // Should not throw
-      await expect(notificationManager.notifyRebalanceSuccess(result)).to.not.be.rejected;
+      await expect(notificationManager.notifyRebalanceSuccess(result)).to.not.be
+        .rejected;
 
       // Should log the error
-      expect(consoleErrorStub.called).to.be.true;
+      expect(consoleLogStub.called).to.be.true;
     });
 
     it("should work without Slack configuration", async function () {
       const configWithoutSlack = { ...mockConfig };
       configWithoutSlack.notifications.slack = undefined;
-      
-      const notificationManagerNoSlack = new NotificationManager(configWithoutSlack);
+
+      const notificationManagerNoSlack = new NotificationManager(
+        configWithoutSlack,
+      );
 
       const result: RebalanceResult = {
         success: true,
@@ -131,7 +137,7 @@ describe("NotificationManager", function () {
       // Should not call Slack API
       await notificationManagerNoSlack.notifyRebalanceSuccess(result);
       expect((webClientStub.chat as any).postMessage.called).to.be.false;
-      
+
       // Should still log locally
       expect(consoleLogStub.called).to.be.true;
     });
@@ -139,29 +145,46 @@ describe("NotificationManager", function () {
 
   describe("notifyRebalanceFailure", function () {
     it("should send failure notification when it's the last trial", async function () {
-      await notificationManager.notifyRebalanceFailure(1, 0.8, "Insufficient liquidity", true);
+      await notificationManager.notifyRebalanceFailure(
+        1,
+        0.8,
+        "Insufficient liquidity",
+        true,
+      );
 
       expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      expect(payload.text).to.include('Failed');
-      expect(payload.text).to.include('INC');
-      expect(payload.text).to.include('80%');
-      expect(payload.text).to.include('Insufficient liquidity');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Failed");
+      expect(payload.text).to.include("INC");
+      expect(payload.text).to.include("80%");
+      expect(payload.text).to.include("Insufficient liquidity");
     });
 
     it("should not send Slack notification for non-final failures", async function () {
-      await notificationManager.notifyRebalanceFailure(1, 0.8, "Insufficient liquidity", false);
+      await notificationManager.notifyRebalanceFailure(
+        1,
+        0.8,
+        "Insufficient liquidity",
+        false,
+      );
 
       expect((webClientStub.chat as any).postMessage.called).to.be.false;
     });
 
     it("should indicate when it's the last trial", async function () {
-      await notificationManager.notifyRebalanceFailure(-1, 0.1, "Price impact too high", true);
+      await notificationManager.notifyRebalanceFailure(
+        -1,
+        0.1,
+        "Price impact too high",
+        true,
+      );
 
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      expect(payload.text).to.include('DEC');
-      expect(payload.text).to.include('10%');
-      expect(payload.text).to.include('all trials exhausted');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("DEC");
+      expect(payload.text).to.include("10%");
+      expect(payload.text).to.include("all trials exhausted");
     });
   });
 
@@ -170,9 +193,10 @@ describe("NotificationManager", function () {
       await notificationManager.notifySkipped("No rebalancing needed");
 
       expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      expect(payload.text).to.include('Skipped');
-      expect(payload.text).to.include('No rebalancing needed');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Skipped");
+      expect(payload.text).to.include("No rebalancing needed");
     });
   });
 
@@ -181,27 +205,116 @@ describe("NotificationManager", function () {
       await notificationManager.notifyError("Failed to get quote");
 
       expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      expect(payload.text).to.include('Bot error');
-      expect(payload.text).to.include('Failed to get quote');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Bot error");
+      expect(payload.text).to.include("Failed to get quote");
     });
 
     it("should sanitize error messages", async function () {
-      const sensitiveError = "Connection failed with key: xoxb-secret-token-123";
+      const sensitiveError =
+        "Connection failed with key: xoxb-secret-token-123";
       await notificationManager.notifyError(sensitiveError);
 
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      // The message should contain the full error (no sanitization implemented)
-      expect(payload.text).to.include('Connection failed');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      // The message should be sanitized now
+      expect(payload.text).to.include("Connection failed");
+      expect(payload.text).to.include("xoxb-[REDACTED]");
+      expect(payload.text).to.not.include("xoxb-secret-token-123");
+    });
+  });
+
+  describe("message sanitization", function () {
+    it("should sanitize Slack tokens in error messages", async function () {
+      const sensitiveError =
+        "Connection failed with token xoxb-1234567890-abcdefghijklmnop";
+      await notificationManager.notifyError(sensitiveError);
+
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("xoxb-[REDACTED]");
+      expect(payload.text).to.not.include("xoxb-1234567890-abcdefghijklmnop");
+    });
+
+    it("should sanitize private keys in failure messages", async function () {
+      const sensitiveError =
+        "Transaction failed: private key 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef exposed";
+      await notificationManager.notifyRebalanceFailure(
+        1,
+        0.8,
+        sensitiveError,
+        true,
+      );
+
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include(
+        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      );
+    });
+
+    it("should sanitize sensitive data in skip messages", async function () {
+      const sensitiveReason =
+        "Config error: PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef is invalid";
+      await notificationManager.notifySkipped(sensitiveReason);
+
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include(
+        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      );
+    });
+
+    it("should preserve transaction hashes in success messages", async function () {
+      const result: RebalanceResult = {
+        success: true,
+        direction: 1,
+        percentage: 0.8,
+        inputAmount: BigInt("5000000000000000000"), // 5 WETH
+        txHash:
+          "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890", // Valid tx hash
+      };
+
+      await notificationManager.notifyRebalanceSuccess(result);
+
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      // Transaction hash should be preserved (not redacted)
+      expect(payload.text).to.include(
+        "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
+      );
+    });
+
+    it("should handle messages with multiple sensitive values", async function () {
+      const complexError =
+        "Auth failed: token xoxb-123-abc, key: 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef, user token xoxa-456-def";
+      await notificationManager.notifyError(complexError);
+
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("xoxb-[REDACTED]");
+      expect(payload.text).to.include("xoxa-[REDACTED]");
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include("xoxb-123-abc");
+      expect(payload.text).to.not.include("xoxa-456-def");
+      expect(payload.text).to.not.include(
+        "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
+      );
     });
   });
 
   describe("error handling", function () {
     it("should handle network failures gracefully", async function () {
-      (webClientStub.chat as any).postMessage.rejects(new Error('Network timeout'));
+      (webClientStub.chat as any).postMessage.rejects(
+        new Error("Network timeout"),
+      );
 
       // All notification methods should not throw
-      await expect(notificationManager.notifySkipped("test")).to.not.be.rejected;
+      await expect(notificationManager.notifySkipped("test")).to.not.be
+        .rejected;
       await expect(notificationManager.notifyError("test")).to.not.be.rejected;
 
       // Should log errors but continue
@@ -209,14 +322,22 @@ describe("NotificationManager", function () {
     });
 
     it("should handle invalid Slack responses", async function () {
-      (webClientStub.chat as any).postMessage.rejects(new Error('invalid_auth'));
+      (webClientStub.chat as any).postMessage.rejects(
+        new Error("invalid_auth"),
+      );
 
       await notificationManager.notifySkipped("test");
 
       // Should log the error
-      expect(consoleErrorStub.called).to.be.true;
-      const errorCall = consoleErrorStub.getCall(0);
-      expect(errorCall.args[0]).to.include('Failed to send Slack message');
+      expect(consoleLogStub.called).to.be.true;
+      const errorCall = consoleLogStub
+        .getCalls()
+        .find(
+          (call) =>
+            call.args[0].includes("ERROR") &&
+            call.args[0].includes("Failed to send Slack message"),
+        );
+      expect(errorCall).to.not.be.undefined;
     });
   });
 
@@ -233,9 +354,10 @@ describe("NotificationManager", function () {
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
-      expect(payload.text).to.include('1.5 WETH');
-      expect(payload.text).to.include('2500.0 dUSD');
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("1.5 WETH");
+      expect(payload.text).to.include("2500.0 dUSD");
     });
 
     it("should handle very large numbers", async function () {
@@ -249,9 +371,10 @@ describe("NotificationManager", function () {
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      const payload = (webClientStub.chat as any).postMessage.getCall(0).args[0];
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
       // Should format correctly without throwing
-      expect(payload.text).to.include('dUSD');
+      expect(payload.text).to.include("dUSD");
     });
   });
 });

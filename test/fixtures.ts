@@ -1,5 +1,6 @@
-import { ethers } from "hardhat";
 import { SignerWithAddress } from "@nomicfoundation/hardhat-ethers/signers";
+import { ethers } from "hardhat";
+
 import { BotConfig } from "../config/types";
 
 export interface TestFixture {
@@ -13,6 +14,9 @@ export interface TestFixture {
   config: BotConfig;
 }
 
+/**
+ *
+ */
 export async function deployTestFixture(): Promise<TestFixture> {
   const [deployer, user] = await ethers.getSigners();
 
@@ -22,14 +26,14 @@ export async function deployTestFixture(): Promise<TestFixture> {
     "Mock WETH",
     "WETH",
     18,
-    ethers.parseEther("1000000") // 1M tokens
+    ethers.parseEther("1000000"), // 1M tokens
   );
-  
+
   const debtToken = await MockERC20.deploy(
-    "Mock dUSD", 
+    "Mock dUSD",
     "dUSD",
     18,
-    ethers.parseEther("1000000") // 1M tokens
+    ethers.parseEther("1000000"), // 1M tokens
   );
 
   // Deploy mock flash lender
@@ -44,7 +48,7 @@ export async function deployTestFixture(): Promise<TestFixture> {
   const DLoopCoreMock = await ethers.getContractFactory("DLoopCoreMock");
   const dloopCore = await DLoopCoreMock.deploy(
     await collateralToken.getAddress(),
-    await debtToken.getAddress()
+    await debtToken.getAddress(),
   );
 
   // Create test config
@@ -76,7 +80,9 @@ export async function deployTestFixture(): Promise<TestFixture> {
     policy: {
       rebalancePercentageList: [1.0, 0.9, 0.8, 0.7, 0.6, 0.5],
       minSubsidyAmount: {
-        [await collateralToken.getAddress()]: ethers.parseEther("0.1").toString(),
+        [await collateralToken.getAddress()]: ethers
+          .parseEther("0.1")
+          .toString(),
         [await debtToken.getAddress()]: ethers.parseEther("0.1").toString(),
       },
       maxTxRetriesPerTrial: 3,

@@ -1,10 +1,11 @@
-import { BotConfig, RebalanceQuote } from "../../config/types";
 import {
+  getExactOutInputCapBps,
+  getMaxPriceImpactBps,
   getSlippageLimitBps,
-  getMaxPriceImpactBps
 } from "../../config/constants";
-import { logger } from "../common/log";
+import { BotConfig, RebalanceQuote } from "../../config/types";
 import { formatTokenAmount } from "../common/erc20";
+import { logger } from "../common/log";
 import { OdosClient } from "../odos/client";
 import { ContractManager } from "./contracts";
 
@@ -56,13 +57,13 @@ export class SwapDataBuilder {
 
     if (priceImpactBps > maxPriceImpactBps) {
       throw new Error(
-        `Price impact too high: ${priceImpactBps / 100}% > ${maxPriceImpactBps / 100}%`
+        `Price impact too high: ${priceImpactBps / 100}% > ${maxPriceImpactBps / 100}%`,
       );
     }
 
     logger.debug("Price impact check passed:", {
       priceImpact: `${priceImpactBps / 100}%`,
-      maxAllowed: `${maxPriceImpactBps / 100}%`
+      maxAllowed: `${maxPriceImpactBps / 100}%`,
     });
   }
 
@@ -92,8 +93,9 @@ export class SwapDataBuilder {
         this.config.tokens.debt.address,
       );
 
-    // Set a high input cap (150% of estimated) to ensure we have enough for exact-output
-    const debtInputCap = (estimatedDebtInput * 150n) / 100n;
+    // Set a high input cap to ensure we have enough for exact-output
+    const inputCapBps = getExactOutInputCapBps();
+    const debtInputCap = (estimatedDebtInput * BigInt(inputCapBps)) / 10000n;
     const debtInputCapFormatted = formatTokenAmount(
       debtInputCap,
       this.config.tokens.debt.decimals,
@@ -102,6 +104,7 @@ export class SwapDataBuilder {
     logger.debug("Odos exact-output quote request for increase:", {
       inputToken: this.config.tokens.debt.symbol,
       inputCap: debtInputCapFormatted,
+      inputCapPercent: `${inputCapBps / 100}%`,
       outputToken: this.config.tokens.collateral.symbol,
       exactOutputAmount: collateralAmountOutFormatted,
     });
@@ -173,8 +176,10 @@ export class SwapDataBuilder {
         this.config.tokens.collateral.address,
       );
 
-    // Set a high input cap (150% of estimated) to ensure we have enough for exact-output
-    const collateralInputCap = (estimatedCollateralInput * 150n) / 100n;
+    // Set a high input cap to ensure we have enough for exact-output
+    const inputCapBps = getExactOutInputCapBps();
+    const collateralInputCap =
+      (estimatedCollateralInput * BigInt(inputCapBps)) / 10000n;
     const collateralInputCapFormatted = formatTokenAmount(
       collateralInputCap,
       this.config.tokens.collateral.decimals,
@@ -183,6 +188,7 @@ export class SwapDataBuilder {
     logger.debug("Odos exact-output quote request for decrease:", {
       inputToken: this.config.tokens.collateral.symbol,
       inputCap: collateralInputCapFormatted,
+      inputCapPercent: `${inputCapBps / 100}%`,
       outputToken: this.config.tokens.debt.symbol,
       exactOutputAmount: totalDebtNeededFormatted,
       flashFee: formatTokenAmount(flashFee, this.config.tokens.debt.decimals),

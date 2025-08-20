@@ -1,7 +1,10 @@
+import {
+  ONE_HUNDRED_PERCENT_BPS,
+  PERCENTAGE_PRECISION,
+} from "../../config/constants";
 import { BotConfig, RebalanceQuote } from "../../config/types";
-import { ONE_HUNDRED_PERCENT_BPS, PERCENTAGE_PRECISION } from "../../config/constants";
-import { logger } from "../common/log";
 import { formatTokenAmountWithSymbol } from "../common/erc20";
+import { logger } from "../common/log";
 import { ContractManager } from "./contracts";
 
 export class QuoteManager {
@@ -91,16 +94,21 @@ export class QuoteManager {
 
   async checkTrialSubsidyGate(
     quote: RebalanceQuote,
-    percentage: number
+    percentage: number,
   ): Promise<boolean> {
     try {
       const subsidyBps = await this.contracts.core.getCurrentSubsidyBps();
-      
+
       // Calculate trial output amount using the same precision as trial selection
-      const scaledPercentage = BigInt(Math.round(percentage * Number(PERCENTAGE_PRECISION)));
-      const trialEstimatedOutput = (quote.estimatedOutputTokenAmount * scaledPercentage) / PERCENTAGE_PRECISION;
-      
-      const trialSubsidy = (trialEstimatedOutput * subsidyBps) / BigInt(ONE_HUNDRED_PERCENT_BPS);
+      const scaledPercentage = BigInt(
+        Math.round(percentage * Number(PERCENTAGE_PRECISION)),
+      );
+      const trialEstimatedOutput =
+        (quote.estimatedOutputTokenAmount * scaledPercentage) /
+        PERCENTAGE_PRECISION;
+
+      const trialSubsidy =
+        (trialEstimatedOutput * subsidyBps) / BigInt(ONE_HUNDRED_PERCENT_BPS);
 
       // Determine output token based on direction
       const outputToken =
@@ -135,7 +143,9 @@ export class QuoteManager {
       });
 
       if (trialSubsidy < minSubsidy) {
-        logger.debug(`Trial subsidy below minimum threshold for ${(percentage * 100).toFixed(1)}%`);
+        logger.debug(
+          `Trial subsidy below minimum threshold for ${(percentage * 100).toFixed(1)}%`,
+        );
         return false;
       }
 

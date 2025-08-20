@@ -1,7 +1,9 @@
 import { WebClient } from "@slack/web-api";
+
 import { BotConfig, RebalanceResult } from "../../config/types";
-import { logger } from "../common/log";
 import { formatTokenAmountWithSymbol } from "../common/erc20";
+import { logger } from "../common/log";
+import { sanitizeForLogs } from "../common/sanitize";
 
 export class NotificationManager {
   private slackClient?: WebClient;
@@ -46,7 +48,7 @@ export class NotificationManager {
       `tx=${result.txHash} gas=${result.gasUsed?.toString() || "unknown"}`;
 
     logger.info(message);
-    await this.sendSlackMessage(message);
+    await this.sendSlackMessage(sanitizeForLogs(message));
   }
 
   async notifyRebalanceFailure(
@@ -62,21 +64,22 @@ export class NotificationManager {
       `${isLastTrial ? "all trials exhausted" : "trying next..."}`;
 
     logger.warn(message);
+
     if (isLastTrial) {
-      await this.sendSlackMessage(message);
+      await this.sendSlackMessage(sanitizeForLogs(message));
     }
   }
 
   async notifySkipped(reason: string): Promise<void> {
     const message = `⏭️ Skipped rebalancing: ${reason}`;
     logger.info(message);
-    await this.sendSlackMessage(message);
+    await this.sendSlackMessage(sanitizeForLogs(message));
   }
 
   async notifyError(error: string): Promise<void> {
     const message = `🚨 Bot error: ${error}`;
     logger.error(message);
-    await this.sendSlackMessage(message);
+    await this.sendSlackMessage(sanitizeForLogs(message));
   }
 
   private async sendSlackMessage(message: string): Promise<void> {

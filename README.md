@@ -63,6 +63,7 @@ Key configuration options:
 - `ODOS_ROUTER_ADDRESS`: Odos router address (if supported on network)
 - `FLASH_LENDER_ADDRESS`: ERC-3156 flash lender address
 - `MIN_SUBSIDY_*`: Minimum subsidy thresholds for profitability
+- `EXACT_OUT_INPUT_CAP_BPS`: Input cap for exact-output swaps (10000-50000, default 15000 = 150%)
 - `SLACK_TOKEN`: Slack bot token for notifications
 - `DRY_RUN`: Set to "true" for testing without real transactions
 
@@ -179,3 +180,4 @@ Set `LOG_LEVEL=debug` for detailed execution logs.
 - **Docker-First**: Designed for containerized production deployment
 - **Minimal Interfaces**: Only includes necessary contract interfaces for smaller footprint
 - **Error-First**: Comprehensive error handling and graceful failure recovery
+- **High-Precision Math**: Uses 9-decimal place precision (1,000,000,000n) for percentage calculations to avoid rounding errors across small trial percentages while keeping all math in integers
