@@ -33,12 +33,8 @@ describe("SwapDataBuilder", function () {
 
   describe("buildSwapData", function () {
     it("should use configurable input cap from environment", async function () {
-      // Set environment variable for input cap before creating SwapDataBuilder
+      // Set environment variable for input cap
       process.env.EXACT_OUT_INPUT_CAP_BPS = "20000"; // 200%
-
-      // Re-create SwapDataBuilder to pick up the new environment variable
-      swapDataBuilder = new SwapDataBuilder(contractManager, fixture.config);
-      (swapDataBuilder as any).odosClient = odosClientStub;
 
       const quote = {
         inputTokenAmount: ethers.parseEther("5"),
@@ -110,8 +106,7 @@ describe("SwapDataBuilder", function () {
       // Expected calculation: estimatedInput * 20000 / 10000 = estimatedInput * 2
       const inputAmount = BigInt(quoteRequest.inputTokens[0].amount);
       // The actual calculation is based on estimated debt input, which should be higher with 200% cap
-      // With 200% cap, we should get more than with 150% cap (which would be about 7.5 ether)
-      expect(inputAmount).to.be.greaterThan(ethers.parseEther("7")); // Should be more than the 150% default would give
+      expect(inputAmount).to.be.greaterThan(ethers.parseEther("7500")); // Should be more than the 150% default would give
 
       // Clean up
       delete process.env.EXACT_OUT_INPUT_CAP_BPS;

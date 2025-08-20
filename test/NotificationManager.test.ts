@@ -56,34 +56,20 @@ describe("NotificationManager", function () {
   beforeEach(function () {
     // Create a stubbed WebClient instance
     webClientStub = sinon.createStubInstance(WebClient);
-
-    // Create notification manager first (this will set up slackClient/slackChannel based on config)
-    notificationManager = new NotificationManager(mockConfig);
-
-    // Ensure slackChannel is properly set
-    (notificationManager as any).slackChannel =
-      mockConfig.notifications.slack?.channel;
-
-    // Now inject our stubbed WebClient
-    (notificationManager as any).slackClient = webClientStub;
-
-    // Create a proper stub for postMessage and assign it correctly
-    const postMessageStub = sinon.stub().resolves({ ok: true });
-    (webClientStub as any).chat = {};
-    (webClientStub as any).chat.postMessage = postMessageStub;
-
-    // Create a spy on the sendSlackMessage method to track calls
-    // For most tests, make it resolve successfully
-    const sendSlackMessageStub = sinon.stub(notificationManager as any, 'sendSlackMessage').resolves();
+    (webClientStub.chat as any) = {
+      postMessage: sinon.stub().resolves({ ok: true }),
+    };
 
     consoleLogStub = sinon.stub(console, "log");
     consoleErrorStub = sinon.stub(console, "error");
+
+    // Create notification manager and inject the stubbed WebClient
+    notificationManager = new NotificationManager(mockConfig);
+    (notificationManager as any).slackClient = webClientStub;
   });
 
   afterEach(function () {
-    // Only restore console stubs, keep Slack client stubs
-    consoleLogStub.restore();
-    consoleErrorStub.restore();
+    sinon.restore();
   });
 
   describe("notifyRebalanceSuccess", function () {
@@ -100,14 +86,16 @@ describe("NotificationManager", function () {
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("Rebalanced"); // Check for success message
-      expect(call.args[0]).to.include("INC"); // Increase direction
-      expect(call.args[0]).to.include("80%"); // Percentage
-      expect(call.args[0]).to.include("5.0 WETH"); // Input amount formatted
-      expect(call.args[0]).to.include("0xabcdef1234567890"); // TX hash
+      expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
+      const call = (webClientStub.chat as any).postMessage.getCall(0);
+
+      const payload = call.args[0];
+      expect(payload.channel).to.equal("#test-channel");
+      expect(payload.text).to.include("Rebalanced"); // Check for success message
+      expect(payload.text).to.include("INC"); // Increase direction
+      expect(payload.text).to.include("80%"); // Percentage
+      expect(payload.text).to.include("5.0 WETH"); // Input amount formatted
+      expect(payload.text).to.include("0xabcdef1234567890"); // TX hash
     });
 
     it("should handle Slack errors gracefully", async function () {
@@ -168,13 +156,13 @@ describe("NotificationManager", function () {
         true,
       );
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("Failed");
-      expect(call.args[0]).to.include("INC");
-      expect(call.args[0]).to.include("80%");
-      expect(call.args[0]).to.include("Insufficient liquidity");
+      expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Failed");
+      expect(payload.text).to.include("INC");
+      expect(payload.text).to.include("80%");
+      expect(payload.text).to.include("Insufficient liquidity");
     });
 
     it("should not send Slack notification for non-final failures", async function () {
@@ -185,8 +173,7 @@ describe("NotificationManager", function () {
         false,
       );
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.called).to.be.false;
+      expect((webClientStub.chat as any).postMessage.called).to.be.false;
     });
 
     it("should indicate when it's the last trial", async function () {
@@ -197,12 +184,11 @@ describe("NotificationManager", function () {
         true,
       );
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("DEC");
-      expect(call.args[0]).to.include("10%");
-      expect(call.args[0]).to.include("all trials exhausted");
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("DEC");
+      expect(payload.text).to.include("10%");
+      expect(payload.text).to.include("all trials exhausted");
     });
   });
 
@@ -210,11 +196,11 @@ describe("NotificationManager", function () {
     it("should send skip notification", async function () {
       await notificationManager.notifySkipped("No rebalancing needed");
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("Skipped");
-      expect(call.args[0]).to.include("No rebalancing needed");
+      expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Skipped");
+      expect(payload.text).to.include("No rebalancing needed");
     });
   });
 
@@ -222,11 +208,11 @@ describe("NotificationManager", function () {
     it("should send error notification", async function () {
       await notificationManager.notifyError("Failed to get quote");
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("Bot error");
-      expect(call.args[0]).to.include("Failed to get quote");
+      expect((webClientStub.chat as any).postMessage.calledOnce).to.be.true;
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("Bot error");
+      expect(payload.text).to.include("Failed to get quote");
     });
 
     it("should sanitize error messages", async function () {
@@ -249,11 +235,10 @@ describe("NotificationManager", function () {
         "Connection failed with token xoxb-1234567890-abcdefghijklmnop";
       await notificationManager.notifyError(sensitiveError);
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("xoxb-[REDACTED]");
-      expect(call.args[0]).to.not.include("xoxb-1234567890-abcdefghijklmnop");
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("xoxb-[REDACTED]");
+      expect(payload.text).to.not.include("xoxb-1234567890-abcdefghijklmnop");
     });
 
     it("should sanitize private keys in failure messages", async function () {
@@ -266,11 +251,10 @@ describe("NotificationManager", function () {
         true,
       );
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("0x[REDACTED]");
-      expect(call.args[0]).to.not.include(
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include(
         "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       );
     });
@@ -280,11 +264,10 @@ describe("NotificationManager", function () {
         "Config error: PRIVATE_KEY=0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef is invalid";
       await notificationManager.notifySkipped(sensitiveReason);
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("0x[REDACTED]");
-      expect(call.args[0]).to.not.include(
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include(
         "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       );
     });
@@ -301,11 +284,10 @@ describe("NotificationManager", function () {
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
       // Transaction hash should be preserved (not redacted)
-      expect(call.args[0]).to.include(
+      expect(payload.text).to.include(
         "0xabcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890",
       );
     });
@@ -315,15 +297,14 @@ describe("NotificationManager", function () {
         "Auth failed: token xoxb-123-abc, key: 0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef, user token xoxa-456-def";
       await notificationManager.notifyError(complexError);
 
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("xoxb-[REDACTED]");
-      expect(call.args[0]).to.include("xoxa-[REDACTED]");
-      expect(call.args[0]).to.include("0x[REDACTED]");
-      expect(call.args[0]).to.not.include("xoxb-123-abc");
-      expect(call.args[0]).to.not.include("xoxa-456-def");
-      expect(call.args[0]).to.not.include(
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("xoxb-[REDACTED]");
+      expect(payload.text).to.include("xoxa-[REDACTED]");
+      expect(payload.text).to.include("0x[REDACTED]");
+      expect(payload.text).to.not.include("xoxb-123-abc");
+      expect(payload.text).to.not.include("xoxa-456-def");
+      expect(payload.text).to.not.include(
         "0x1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef",
       );
     });
@@ -345,9 +326,9 @@ describe("NotificationManager", function () {
     });
 
     it("should handle invalid Slack responses", async function () {
-      // Make sendSlackMessage reject to test error handling
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      sendSlackMessageStub.rejects(new Error("invalid_auth"));
+      (webClientStub.chat as any).postMessage.rejects(
+        new Error("invalid_auth"),
+      );
 
       await notificationManager.notifySkipped("test");
 
@@ -377,12 +358,10 @@ describe("NotificationManager", function () {
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      // Check that sendSlackMessage was called
-      const sendSlackMessageStub = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageStub.calledOnce).to.be.true;
-      const call = sendSlackMessageStub.getCall(0);
-      expect(call.args[0]).to.include("1.5 WETH");
-      expect(call.args[0]).to.include("2500.0 dUSD");
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      expect(payload.text).to.include("1.5 WETH");
+      expect(payload.text).to.include("2500.0 dUSD");
     });
 
     it("should handle very large numbers", async function () {
@@ -391,19 +370,15 @@ describe("NotificationManager", function () {
         direction: -1,
         percentage: 1.0,
         inputAmount: BigInt("999999999999999999999999"), // Very large number
-        outputAmount: BigInt("1000000000000000000000"), // 1000 dUSD
         txHash: "0xtest",
       };
 
       await notificationManager.notifyRebalanceSuccess(result);
 
-      // Check that sendSlackMessage was called
-      const sendSlackMessageSpy = (notificationManager as any).sendSlackMessage;
-      expect(sendSlackMessageSpy.calledOnce).to.be.true;
-
-      // Check that it was called with the right message content
-      const call = sendSlackMessageSpy.getCall(0);
-      expect(call.args[0]).to.include("dUSD");
+      const payload = (webClientStub.chat as any).postMessage.getCall(0)
+        .args[0];
+      // Should format correctly without throwing
+      expect(payload.text).to.include("dUSD");
     });
   });
 });
