@@ -48,14 +48,14 @@ describe("SwapDataBuilder", function () {
         outTokens: [fixture.config.tokens.collateral.address],
         outAmounts: [ethers.parseEther("5").toString()],
         inTokens: [fixture.config.tokens.debt.address],
-        inAmounts: [ethers.parseEther("15000").toString()], // 200% of 7500
+        inAmounts: [ethers.parseEther("10").toString()], // 200% of estimated input (5 * 2 = 10)
         gasEstimate: 500000,
         dataGasEstimate: 0,
         gweiPerGas: 20,
         gasEstimateValue: 0.01,
-        inValues: [15000],
-        outValues: [5000],
-        netOutValue: -10000,
+        inValues: [10],
+        outValues: [5],
+        netOutValue: -5,
         percentDiff: 0,
         partnerFeePercent: 0,
       };
@@ -66,7 +66,7 @@ describe("SwapDataBuilder", function () {
         inputTokens: [
           {
             tokenAddress: fixture.config.tokens.debt.address,
-            amountDeducted: "15000000000000000000000",
+            amountDeducted: "10000000000000000000", // 10 ether in wei
           },
         ],
         outputTokens: [
@@ -75,8 +75,8 @@ describe("SwapDataBuilder", function () {
             amountReceived: "5000000000000000000",
           },
         ],
-        netOutValue: -10000,
-        outValues: [5000],
+        netOutValue: -5,
+        outValues: [5],
         transaction: {
           gas: 500000,
           gasPrice: 20000000000,
@@ -105,8 +105,8 @@ describe("SwapDataBuilder", function () {
       // The input amount should be calculated with 200% cap instead of default 150%
       // Expected calculation: estimatedInput * 20000 / 10000 = estimatedInput * 2
       const inputAmount = BigInt(quoteRequest.inputTokens[0].amount);
-      // The actual calculation is based on estimated debt input, which should be higher with 200% cap
-      expect(inputAmount).to.be.greaterThan(ethers.parseEther("7500")); // Should be more than the 150% default would give
+      // With 1:1 conversion rate and 200% cap: 5 * 2 = 10
+      expect(inputAmount).to.equal(ethers.parseEther("10")); // Should be exactly 10 with 200% cap
 
       // Clean up
       delete process.env.EXACT_OUT_INPUT_CAP_BPS;
