@@ -16,7 +16,7 @@ test: ## Run tests
 	yarn hardhat test
 
 lint: ## Lint TypeScript code
-	yarn lint
+	@yarn eslint --fix typescript/**/*.ts test/*.ts
 
 format: ## Format TypeScript code
 	yarn format
