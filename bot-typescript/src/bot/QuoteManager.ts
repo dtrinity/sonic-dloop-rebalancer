@@ -3,7 +3,7 @@ import {
   PERCENTAGE_PRECISION,
 } from "../config/constants";
 import { BotConfig, RebalanceQuote } from "../config/types";
-import { formatTokenAmountWithSymbol } from "../common/erc20";
+import { formatTokenAmountWithSymbol, getTokenMetadata } from "../common/erc20";
 import { logger } from "../common/log";
 import { ContractManager } from "./ContractManager";
 
@@ -50,32 +50,40 @@ export class QuoteManager {
         BigInt(ONE_HUNDRED_PERCENT_BPS);
 
       // Determine output token based on direction
-      const outputToken =
+      const outputTokenAddress =
         quote.direction === 1
-          ? this.config.tokens.debt
-          : this.config.tokens.collateral;
+          ? this.config.tokens.debt.address
+          : this.config.tokens.collateral.address;
       const minSubsidyStr =
-        this.config.policy.minSubsidyAmount[outputToken.address];
+        this.config.policy.minSubsidyAmount[outputTokenAddress];
 
       if (!minSubsidyStr) {
+        const outputTokenMetadata = await getTokenMetadata(
+          this.contracts.provider,
+          outputTokenAddress,
+        );
         logger.warn(
-          `No minimum subsidy configured for ${outputToken.symbol}, allowing rebalance`,
+          `No minimum subsidy configured for ${outputTokenMetadata.symbol}, allowing rebalance`,
         );
         return true;
       }
 
       const minSubsidy = BigInt(minSubsidyStr);
+      const outputTokenMetadata = await getTokenMetadata(
+        this.contracts.provider,
+        outputTokenAddress,
+      );
 
       logger.info("Subsidy check:", {
         estimatedSubsidy: formatTokenAmountWithSymbol(
           estSubsidy,
-          outputToken.decimals,
-          outputToken.symbol,
+          outputTokenMetadata.decimals,
+          outputTokenMetadata.symbol,
         ),
         minimumRequired: formatTokenAmountWithSymbol(
           minSubsidy,
-          outputToken.decimals,
-          outputToken.symbol,
+          outputTokenMetadata.decimals,
+          outputTokenMetadata.symbol,
         ),
         subsidyBps: subsidyBps.toString(),
       });
@@ -111,33 +119,41 @@ export class QuoteManager {
         (trialEstimatedOutput * subsidyBps) / BigInt(ONE_HUNDRED_PERCENT_BPS);
 
       // Determine output token based on direction
-      const outputToken =
+      const outputTokenAddress =
         quote.direction === 1
-          ? this.config.tokens.debt
-          : this.config.tokens.collateral;
+          ? this.config.tokens.debt.address
+          : this.config.tokens.collateral.address;
       const minSubsidyStr =
-        this.config.policy.minSubsidyAmount[outputToken.address];
+        this.config.policy.minSubsidyAmount[outputTokenAddress];
 
       if (!minSubsidyStr) {
+        const outputTokenMetadata = await getTokenMetadata(
+          this.contracts.provider,
+          outputTokenAddress,
+        );
         logger.warn(
-          `No minimum subsidy configured for ${outputToken.symbol}, allowing trial`,
+          `No minimum subsidy configured for ${outputTokenMetadata.symbol}, allowing trial`,
         );
         return true;
       }
 
       const minSubsidy = BigInt(minSubsidyStr);
+      const outputTokenMetadata = await getTokenMetadata(
+        this.contracts.provider,
+        outputTokenAddress,
+      );
 
       logger.debug("Trial subsidy check:", {
         percentage: `${(percentage * 100).toFixed(1)}%`,
         trialSubsidy: formatTokenAmountWithSymbol(
           trialSubsidy,
-          outputToken.decimals,
-          outputToken.symbol,
+          outputTokenMetadata.decimals,
+          outputTokenMetadata.symbol,
         ),
         minimumRequired: formatTokenAmountWithSymbol(
           minSubsidy,
-          outputToken.decimals,
-          outputToken.symbol,
+          outputTokenMetadata.decimals,
+          outputTokenMetadata.symbol,
         ),
         subsidyBps: subsidyBps.toString(),
       });

@@ -15,8 +15,6 @@ export interface ContractsConfig {
 
 export interface TokenConfig {
   address: string;
-  decimals: number;
-  symbol: string;
 }
 
 export interface TokensConfig {

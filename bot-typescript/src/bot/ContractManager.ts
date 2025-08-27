@@ -67,16 +67,18 @@ export interface FlashLenderContract {
 }
 
 export class ContractManager {
+  public readonly provider: ethers.Provider;
   public readonly core: DLoopCoreContract;
   public readonly increaseOdos: IncreaseLeverageContract;
   public readonly decreaseOdos: DecreaseLeverageContract;
   public readonly flashLender: FlashLenderContract;
 
   constructor(
-    private readonly provider: ethers.Provider,
+    provider: ethers.Provider,
     private readonly signer: ethers.Signer,
     private readonly config: BotConfig,
   ) {
+    this.provider = provider;
     // Create contract instances with minimal ABIs
     this.core = new ethers.Contract(
       config.contracts.dloopCore,

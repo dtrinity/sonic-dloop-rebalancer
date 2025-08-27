@@ -4,13 +4,15 @@ import {
   getSlippageLimitBps,
 } from "../config/constants";
 import { BotConfig, RebalanceQuote } from "../config/types";
-import { formatTokenAmount } from "../common/erc20";
+import { formatTokenAmount, getTokenDecimals, getTokenSymbol, getTokenMetadata } from "../common/erc20";
 import { logger } from "../common/log";
 import { OdosClient } from "./OdosClient";
 import { ContractManager } from "./ContractManager";
 
 export class SwapDataBuilder {
   private odosClient: OdosClient;
+  private collateralMetadata?: { decimals: number; symbol: string };
+  private debtMetadata?: { decimals: number; symbol: string };
 
   constructor(
     private readonly contracts: ContractManager,
@@ -20,6 +22,26 @@ export class SwapDataBuilder {
       config.network.odosApiUrl,
       config.network.chainId,
     );
+  }
+
+  private async getCollateralMetadata() {
+    if (!this.collateralMetadata) {
+      this.collateralMetadata = await getTokenMetadata(
+        this.contracts.provider,
+        this.config.tokens.collateral.address,
+      );
+    }
+    return this.collateralMetadata;
+  }
+
+  private async getDebtMetadata() {
+    if (!this.debtMetadata) {
+      this.debtMetadata = await getTokenMetadata(
+        this.contracts.provider,
+        this.config.tokens.debt.address,
+      );
+    }
+    return this.debtMetadata;
   }
 
   async buildSwapData(
@@ -76,9 +98,10 @@ export class SwapDataBuilder {
     });
 
     // For increase: we need exact collateral out, spending debt tokens
+    const collateralMetadata = await this.getCollateralMetadata();
     const collateralAmountOutFormatted = formatTokenAmount(
       collateralAmountOut,
-      this.config.tokens.collateral.decimals,
+      collateralMetadata.decimals,
     );
 
     // Estimate required debt input for the high input cap
@@ -96,16 +119,17 @@ export class SwapDataBuilder {
     // Set a high input cap to ensure we have enough for exact-output
     const inputCapBps = getExactOutInputCapBps();
     const debtInputCap = (estimatedDebtInput * BigInt(inputCapBps)) / 10000n;
+    const debtMetadata = await this.getDebtMetadata();
     const debtInputCapFormatted = formatTokenAmount(
       debtInputCap,
-      this.config.tokens.debt.decimals,
+      debtMetadata.decimals,
     );
 
     logger.debug("Odos exact-output quote request for increase:", {
-      inputToken: this.config.tokens.debt.symbol,
+      inputToken: debtMetadata.symbol,
       inputCap: debtInputCapFormatted,
       inputCapPercent: `${inputCapBps / 100}%`,
-      outputToken: this.config.tokens.collateral.symbol,
+      outputToken: collateralMetadata.symbol,
       exactOutputAmount: collateralAmountOutFormatted,
     });
 
@@ -159,9 +183,10 @@ export class SwapDataBuilder {
 
     // Total debt needed = repay amount + flash fee
     const totalDebtNeeded = debtAmountToRepay + flashFee;
+    const debtMetadata = await this.getDebtMetadata();
     const totalDebtNeededFormatted = formatTokenAmount(
       totalDebtNeeded,
-      this.config.tokens.debt.decimals,
+      debtMetadata.decimals,
     );
 
     // Estimate required collateral input for the input cap
@@ -180,18 +205,19 @@ export class SwapDataBuilder {
     const inputCapBps = getExactOutInputCapBps();
     const collateralInputCap =
       (estimatedCollateralInput * BigInt(inputCapBps)) / 10000n;
+    const collateralMetadata = await this.getCollateralMetadata();
     const collateralInputCapFormatted = formatTokenAmount(
       collateralInputCap,
-      this.config.tokens.collateral.decimals,
+      collateralMetadata.decimals,
     );
 
     logger.debug("Odos exact-output quote request for decrease:", {
-      inputToken: this.config.tokens.collateral.symbol,
+      inputToken: collateralMetadata.symbol,
       inputCap: collateralInputCapFormatted,
       inputCapPercent: `${inputCapBps / 100}%`,
-      outputToken: this.config.tokens.debt.symbol,
+      outputToken: debtMetadata.symbol,
       exactOutputAmount: totalDebtNeededFormatted,
-      flashFee: formatTokenAmount(flashFee, this.config.tokens.debt.decimals),
+      flashFee: formatTokenAmount(flashFee, debtMetadata.decimals),
     });
 
     const quoteRequest = {

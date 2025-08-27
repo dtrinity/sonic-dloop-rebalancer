@@ -2,6 +2,7 @@ import { expect } from "chai";
 import sinon from "sinon";
 
 import { RebalanceManager } from "../src/bot/RebalanceManager";
+import * as erc20 from "../src/common/erc20";
 import {
   BotConfig,
   RebalanceQuote,
@@ -17,6 +18,20 @@ describe("RebalanceManager", function () {
   let mockNotificationManager: any;
 
   beforeEach(function () {
+    // Mock the getTokenMetadata function
+    sinon
+      .stub(erc20, "getTokenMetadata")
+      .callsFake(async (provider: any, tokenAddress: string) => {
+        if (tokenAddress === "0x5555555555555555555555555555555555555555") {
+          return { decimals: 18, symbol: "COL" };
+        } else if (
+          tokenAddress === "0x6666666666666666666666666666666666666666"
+        ) {
+          return { decimals: 18, symbol: "DEBT" };
+        }
+        throw new Error(`Unknown token address: ${tokenAddress}`);
+      });
+
     // Create mock contracts
     mockContracts = {
       getSignerAddress: sinon
@@ -36,6 +51,9 @@ describe("RebalanceManager", function () {
       },
       decreaseOdos: {
         decreaseLeverage: sinon.stub(),
+      },
+      provider: {
+        // Mock provider if needed
       },
     };
 
@@ -58,13 +76,9 @@ describe("RebalanceManager", function () {
       tokens: {
         collateral: {
           address: "0x5555555555555555555555555555555555555555",
-          symbol: "COL",
-          decimals: 18,
         },
         debt: {
           address: "0x6666666666666666666666666666666666666666",
-          symbol: "DEBT",
-          decimals: 18,
         },
       },
       policy: {
@@ -478,5 +492,9 @@ describe("RebalanceManager", function () {
       expect(result.txHash).to.equal("0x1234567890abcdef");
       expect(mockContracts.decreaseOdos.decreaseLeverage.calledOnce).to.be.true;
     });
+  });
+
+  afterEach(function () {
+    sinon.restore();
   });
 });

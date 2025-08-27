@@ -5,7 +5,7 @@ import {
   RETRY_BASE_DELAY_MS,
 } from "../config/constants";
 import { BotConfig, RebalanceQuote, RebalanceResult } from "../config/types";
-import { formatTokenAmountWithSymbol } from "../common/erc20";
+import { formatTokenAmountWithSymbol, getTokenMetadata } from "../common/erc20";
 import { logger } from "../common/log";
 import { ContractManager } from "./ContractManager";
 import { NotificationManager } from "../notification";
@@ -23,7 +23,7 @@ export class RebalanceManager {
   ) {
     this.quoteManager = new QuoteManager(contracts, config);
     this.swapDataBuilder = new SwapDataBuilder(contracts, config);
-    this.notificationManager = new NotificationManager(config);
+    this.notificationManager = new NotificationManager(config, contracts.provider);
   }
 
   async executeRebalance(): Promise<void> {
@@ -306,11 +306,15 @@ export class RebalanceManager {
         async () => {
           if (quote.direction === 1) {
             // Increase leverage
+            const collateralMetadata = await getTokenMetadata(
+              this.contracts.provider,
+              this.config.tokens.collateral.address,
+            );
             logger.info("Executing increase leverage", {
               amount: formatTokenAmountWithSymbol(
                 trialAmount,
-                this.config.tokens.collateral.decimals,
-                this.config.tokens.collateral.symbol,
+                collateralMetadata.decimals,
+                collateralMetadata.symbol,
               ),
             });
 
@@ -321,11 +325,15 @@ export class RebalanceManager {
             );
           } else {
             // Decrease leverage
+            const debtMetadata = await getTokenMetadata(
+              this.contracts.provider,
+              this.config.tokens.debt.address,
+            );
             logger.info("Executing decrease leverage", {
               amount: formatTokenAmountWithSymbol(
                 trialAmount,
-                this.config.tokens.debt.decimals,
-                this.config.tokens.debt.symbol,
+                debtMetadata.decimals,
+                debtMetadata.symbol,
               ),
             });
 

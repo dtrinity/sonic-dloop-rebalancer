@@ -30,13 +30,9 @@ export const SONIC_TESTNET_CONFIG: {
   tokens: {
     collateral: {
       address: "0x0000000000000000000000000000000000000000",
-      decimals: 18,
-      symbol: "COLL",
     },
     debt: {
       address: "0x0000000000000000000000000000000000000000",
-      decimals: 18,
-      symbol: "DEBT",
     },
   },
   policy: {

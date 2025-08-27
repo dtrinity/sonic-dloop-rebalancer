@@ -2,6 +2,7 @@ import { expect } from "chai";
 import sinon from "sinon";
 
 import { QuoteManager } from "../src/bot/QuoteManager";
+import * as erc20 from "../src/common/erc20";
 import { BotConfig, RebalanceQuote } from "../src/config/types";
 
 describe("QuoteManager", function () {
@@ -10,11 +11,28 @@ describe("QuoteManager", function () {
   let mockConfig: BotConfig;
 
   beforeEach(function () {
+    // Mock the getTokenMetadata function
+    sinon
+      .stub(erc20, "getTokenMetadata")
+      .callsFake(async (provider: any, tokenAddress: string) => {
+        if (tokenAddress === "0x5555555555555555555555555555555555555555") {
+          return { decimals: 18, symbol: "COL" };
+        } else if (
+          tokenAddress === "0x6666666666666666666666666666666666666666"
+        ) {
+          return { decimals: 18, symbol: "DEBT" };
+        }
+        throw new Error(`Unknown token address: ${tokenAddress}`);
+      });
+
     // Create mock contracts
     mockContracts = {
       core: {
         quoteRebalanceAmountToReachTargetLeverage: sinon.stub(),
         getCurrentSubsidyBps: sinon.stub(),
+      },
+      provider: {
+        // Mock provider if needed
       },
     };
 
@@ -37,13 +55,9 @@ describe("QuoteManager", function () {
       tokens: {
         collateral: {
           address: "0x5555555555555555555555555555555555555555",
-          symbol: "COL",
-          decimals: 18,
         },
         debt: {
           address: "0x6666666666666666666666666666666666666666",
-          symbol: "DEBT",
-          decimals: 18,
         },
       },
       policy: {
@@ -246,5 +260,9 @@ describe("QuoteManager", function () {
 
       expect(result).to.be.false;
     });
+  });
+
+  afterEach(function () {
+    sinon.restore();
   });
 });

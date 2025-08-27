@@ -1,6 +1,7 @@
 import { WebClient } from "@slack/web-api";
+import { ethers } from "ethers";
 
-import { formatTokenAmountWithSymbol } from "./common/erc20";
+import { formatTokenAmountWithSymbol, getTokenMetadata } from "./common/erc20";
 import { logger } from "./common/log";
 import { sanitizeForLogs } from "./common/sanitize";
 import { BotConfig, RebalanceResult } from "./config/types";
@@ -9,7 +10,10 @@ export class NotificationManager {
   private slackClient?: WebClient;
   private slackChannel?: string;
 
-  constructor(private readonly config: BotConfig) {
+  constructor(
+    private readonly config: BotConfig,
+    private readonly provider: ethers.Provider,
+  ) {
     if (config.notifications.slack) {
       this.slackClient = new WebClient(config.notifications.slack.token);
       this.slackChannel = config.notifications.slack.channel;
@@ -18,28 +22,36 @@ export class NotificationManager {
 
   async notifyRebalanceSuccess(result: RebalanceResult): Promise<void> {
     const direction = result.direction === 1 ? "INC" : "DEC";
-    const inputToken =
+    const inputTokenAddress =
       result.direction === 1
-        ? this.config.tokens.collateral
-        : this.config.tokens.debt;
-    const outputToken =
+        ? this.config.tokens.collateral.address
+        : this.config.tokens.debt.address;
+    const outputTokenAddress =
       result.direction === 1
-        ? this.config.tokens.debt
-        : this.config.tokens.collateral;
+        ? this.config.tokens.debt.address
+        : this.config.tokens.collateral.address;
+
+    const [inputTokenMetadata, outputTokenMetadata] = await Promise.all([
+      getTokenMetadata(this.provider, inputTokenAddress),
+      result.outputAmount
+        ? getTokenMetadata(this.provider, outputTokenAddress)
+        : Promise.resolve(null),
+    ]);
 
     const inputAmountFormatted = formatTokenAmountWithSymbol(
       result.inputAmount,
-      inputToken.decimals,
-      inputToken.symbol,
+      inputTokenMetadata.decimals,
+      inputTokenMetadata.symbol,
     );
 
-    const outputAmountFormatted = result.outputAmount
-      ? formatTokenAmountWithSymbol(
-          result.outputAmount,
-          outputToken.decimals,
-          outputToken.symbol,
-        )
-      : "unknown";
+    const outputAmountFormatted =
+      result.outputAmount && outputTokenMetadata
+        ? formatTokenAmountWithSymbol(
+            result.outputAmount,
+            outputTokenMetadata.decimals,
+            outputTokenMetadata.symbol,
+          )
+        : "unknown";
 
     const message =
       `✅ Rebalanced core=${this.config.contracts.dloopCore.slice(0, 8)}... ` +

@@ -30,13 +30,9 @@ describe("Bot Logic", function () {
       tokens: {
         collateral: {
           address: "0x5555555555555555555555555555555555555555",
-          symbol: "COL",
-          decimals: 18,
         },
         debt: {
           address: "0x6666666666666666666666666666666666666666",
-          symbol: "DEBT",
-          decimals: 18,
         },
       },
       policy: {

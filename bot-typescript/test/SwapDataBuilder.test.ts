@@ -2,6 +2,7 @@ import { expect } from "chai";
 import sinon from "sinon";
 
 import { SwapDataBuilder } from "../src/bot/SwapDataBuilder";
+import * as erc20 from "../src/common/erc20";
 import { BotConfig, RebalanceQuote } from "../src/config/types";
 
 describe("SwapDataBuilder", function () {
@@ -11,6 +12,20 @@ describe("SwapDataBuilder", function () {
   let mockOdosClient: any;
 
   beforeEach(function () {
+    // Mock the getTokenMetadata function
+    sinon
+      .stub(erc20, "getTokenMetadata")
+      .callsFake(async (provider: any, tokenAddress: string) => {
+        if (tokenAddress === "0x5555555555555555555555555555555555555555") {
+          return { decimals: 18, symbol: "COL" };
+        } else if (
+          tokenAddress === "0x6666666666666666666666666666666666666666"
+        ) {
+          return { decimals: 18, symbol: "DEBT" };
+        }
+        throw new Error(`Unknown token address: ${tokenAddress}`);
+      });
+
     // Create mock contracts
     mockContracts = {
       core: {
@@ -19,6 +34,9 @@ describe("SwapDataBuilder", function () {
       },
       flashLender: {
         flashFee: sinon.stub(),
+      },
+      provider: {
+        // Mock provider if needed
       },
     };
 
@@ -41,13 +59,9 @@ describe("SwapDataBuilder", function () {
       tokens: {
         collateral: {
           address: "0x5555555555555555555555555555555555555555",
-          symbol: "COL",
-          decimals: 18,
         },
         debt: {
           address: "0x6666666666666666666666666666666666666666",
-          symbol: "DEBT",
-          decimals: 18,
         },
       },
       policy: {
@@ -258,5 +272,9 @@ describe("SwapDataBuilder", function () {
         expect((error as Error).message).to.include("Price impact too high");
       }
     });
+  });
+
+  afterEach(function () {
+    sinon.restore();
   });
 });
