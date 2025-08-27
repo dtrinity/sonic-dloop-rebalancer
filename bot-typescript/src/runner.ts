@@ -15,7 +15,9 @@ class RebalanceBotRunner {
   private config = getConfig();
   private contractManager?: ContractManager;
   private rebalanceManager?: RebalanceManager;
-  private ignoreCache = new FileCache("ignoreMemory.json");
+  private ignoreCache = new FileCache<{ [key: string]: IgnoreEntry }>(
+    "ignoreMemory.json",
+  );
   private isRunning = false;
 
   async initialize(): Promise<void> {
@@ -87,7 +89,7 @@ class RebalanceBotRunner {
   }
 
   private shouldIgnoreCycle(): boolean {
-    const ignoreData = this.ignoreCache.load<{ [key: string]: IgnoreEntry }>();
+    const ignoreData = this.ignoreCache.load();
 
     if (!ignoreData) {
       return false;
@@ -115,8 +117,7 @@ class RebalanceBotRunner {
   }
 
   private addIgnoreEntry(reason: string): void {
-    const ignoreData =
-      this.ignoreCache.load<{ [key: string]: IgnoreEntry }>() || {};
+    const ignoreData = this.ignoreCache.load() || {};
     const coreAddress = this.config.contracts.dloopCore;
 
     ignoreData[coreAddress] = {

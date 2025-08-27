@@ -14,7 +14,8 @@ test:
 
 # Run linter
 lint:
-	yarn lint:fix
+	@yarn tsc
+	@yarn lint:fix
 
 # Clean build artifacts
 clean:

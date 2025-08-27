@@ -42,9 +42,9 @@ test:
 # Run linter on both sub-repos
 lint:
 	@echo "Running linter on Solidity contracts..."
-	cd bot-solidity-contracts && yarn lint
+	cd bot-solidity-contracts && make lint
 	@echo "Running linter on TypeScript bot..."
-	cd bot-typescript && yarn lint
+	cd bot-typescript && make lint
 
 # Clean build artifacts in both sub-repos
 clean:

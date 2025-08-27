@@ -26,67 +26,30 @@ export const RETRY_BASE_DELAY_MS = 1000; // Base delay for exponential backoff
 // Valid range: 10000-50000 (100%-500%)
 export const DEFAULT_EXACT_OUT_INPUT_CAP_BPS = 15000; // 150%
 
-// Environment variable overrides
 /**
- *
+ * Get the slippage limit in basis points
  */
 export function getSlippageLimitBps(): number {
-  const envValue = process.env.SLIPPAGE_LIMIT_BPS;
-
-  if (envValue) {
-    const parsed = parseInt(envValue, 10);
-
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 1000) {
-      return parsed;
-    }
-  }
   return DEFAULT_SLIPPAGE_LIMIT_BPS;
 }
 
 /**
- *
+ * Get the maximum price impact in basis points
  */
 export function getMaxPriceImpactBps(): number {
-  const envValue = process.env.MAX_PRICE_IMPACT_BPS;
-
-  if (envValue) {
-    const parsed = parseInt(envValue, 10);
-
-    if (!isNaN(parsed) && parsed > 0 && parsed <= 5000) {
-      return parsed;
-    }
-  }
   return MAX_PRICE_IMPACT_BPS;
 }
 
 /**
- *
+ * Get the HTTP timeout in milliseconds
  */
 export function getHttpTimeoutMs(): number {
-  const envValue = process.env.HTTP_TIMEOUT_MS;
-
-  if (envValue) {
-    const parsed = parseInt(envValue, 10);
-
-    if (!isNaN(parsed) && parsed > 0) {
-      return parsed;
-    }
-  }
   return DEFAULT_HTTP_TIMEOUT_MS;
 }
 
 /**
- *
+ * Get the exact output input cap in basis points
  */
 export function getExactOutInputCapBps(): number {
-  const envValue = process.env.EXACT_OUT_INPUT_CAP_BPS;
-
-  if (envValue) {
-    const parsed = parseInt(envValue, 10);
-
-    if (!isNaN(parsed) && parsed >= 10000 && parsed <= 50000) {
-      return parsed;
-    }
-  }
   return DEFAULT_EXACT_OUT_INPUT_CAP_BPS;
 }

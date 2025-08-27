@@ -1,47 +1,52 @@
-import { ContractsConfig, NetworkConfig, TokensConfig } from "./types";
+import {
+  ContractsConfig,
+  NetworkConfig,
+  NotificationsConfig,
+  PolicyConfig,
+  TokensConfig,
+} from "../types";
 
 // Sonic Testnet Configuration
 export const SONIC_TESTNET_CONFIG: {
   network: NetworkConfig;
   contracts: ContractsConfig;
   tokens: TokensConfig;
+  policy: PolicyConfig;
+  notifications: NotificationsConfig;
 } = {
   network: {
     chainId: 64165, // Sonic testnet chain ID
-    rpcUrl: process.env.SONIC_TESTNET_RPC_URL || "",
-    privateKey: process.env.PRIVATE_KEY,
+    rpcUrl: "",
+    privateKey: "",
   },
   contracts: {
-    dloopCore:
-      process.env.DLOOP_CORE_ADDRESS ||
-      "0x0000000000000000000000000000000000000000",
-    increaseOdos:
-      process.env.INCREASE_ODOS_ADDRESS ||
-      "0x0000000000000000000000000000000000000000",
-    decreaseOdos:
-      process.env.DECREASE_ODOS_ADDRESS ||
-      "0x0000000000000000000000000000000000000000",
-    odosRouter:
-      process.env.ODOS_ROUTER_ADDRESS ||
-      "0x0000000000000000000000000000000000000000",
-    flashLender:
-      process.env.FLASH_LENDER_ADDRESS ||
-      "0x0000000000000000000000000000000000000000",
+    dloopCore: "0x0000000000000000000000000000000000000000",
+    increaseOdos: "0x0000000000000000000000000000000000000000",
+    decreaseOdos: "0x0000000000000000000000000000000000000000",
+    odosRouter: "0x0000000000000000000000000000000000000000",
+    flashLender: "0x0000000000000000000000000000000000000000",
   },
   tokens: {
     collateral: {
-      address:
-        process.env.COLLATERAL_TOKEN_ADDRESS ||
-        "0x0000000000000000000000000000000000000000",
-      decimals: parseInt(process.env.COLLATERAL_TOKEN_DECIMALS || "18", 10),
-      symbol: process.env.COLLATERAL_TOKEN_SYMBOL || "COLL",
+      address: "0x0000000000000000000000000000000000000000",
+      decimals: 18,
+      symbol: "COLL",
     },
     debt: {
-      address:
-        process.env.DEBT_TOKEN_ADDRESS ||
-        "0x0000000000000000000000000000000000000000",
-      decimals: parseInt(process.env.DEBT_TOKEN_DECIMALS || "18", 10),
-      symbol: process.env.DEBT_TOKEN_SYMBOL || "DEBT",
+      address: "0x0000000000000000000000000000000000000000",
+      decimals: 18,
+      symbol: "DEBT",
     },
+  },
+  policy: {
+    rebalancePercentageList: [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],
+    minSubsidyAmount: {},
+    maxTxRetriesPerTrial: 3,
+    loopIntervalSec: 60,
+    dryRun: false,
+  },
+  notifications: {
+    slack: undefined,
+    logLevel: "info",
   },
 };

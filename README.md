@@ -65,42 +65,34 @@ cd bot-typescript
 
 ## Configuration
 
-### Environment Variables
+### Network Configuration
 
-Copy the `.env.example` files in each sub-repo and fill in the required values:
+All configuration values are now hardcoded in the network configuration files:
 
-1. For contract deployment (`bot-solidity-contracts/.env`):
-   - `PRIVATE_KEY`: Your wallet private key for contract deployment
-   - `SONIC_MAINNET_RPC_URL`: RPC URL for Sonic mainnet
-   - `SONIC_TESTNET_RPC_URL`: RPC URL for Sonic testnet
-   - `SONICSCAN_API_KEY`: API key for SonicScan block explorer
-   - Contract addresses for existing contracts
+1. **Contract Addresses**: Update the contract addresses in:
+   - `bot-solidity-contracts/config/networks/sonic_mainnet.ts`
+   - `bot-solidity-contracts/config/networks/sonic_testnet.ts`
+   - `bot-typescript/src/config/networks/sonic_mainnet.ts`
+   - `bot-typescript/src/config/networks/sonic_testnet.ts`
 
-2. For bot execution (`bot-typescript/.env`):
-   - `PRIVATE_KEY`: Your wallet private key for bot operations
-   - `SONIC_MAINNET_RPC_URL`: RPC URL for Sonic mainnet
-   - `SONIC_TESTNET_RPC_URL`: RPC URL for Sonic testnet
-   - `SLACK_TOKEN` (optional): Slack API token for notifications
-   - `SLACK_CHANNEL` (optional): Slack channel for notifications
-   - Contract addresses for all required contracts
-   - Token configuration (addresses, decimals, symbols)
-   - Bot parameters (network, loop interval, dry run mode)
-   - Minimum subsidy amounts for profitability checks
-   - Rebalance percentage list for fallback strategy
-   - Transaction retry configuration
-   - Odos integration parameters
+2. **Network Settings**: Update network-specific settings in the respective config files:
+   - RPC URLs
+   - Private keys for deployment/operations
+   - API keys for block explorers
+   - Token configurations
+   - Policy settings (rebalance percentages, retry limits, etc.)
+   - Notification settings (Slack configuration)
 
 ## Deployment
 
-### 1. Configure Environment Variables
+### 1. Configure Network Settings
 
-1. Copy and configure environment files:
-   ```bash
-   cp bot-solidity-contracts/.env.example bot-solidity-contracts/.env
-   cp bot-typescript/.env.example bot-typescript/.env
-   ```
-
-2. Fill in all required values in both `.env` files
+1. Update all required values in the network configuration files:
+   - Set RPC URLs in the network configs
+   - Add private keys for deployment/operations
+   - Update contract addresses
+   - Configure token settings
+   - Set API keys for block explorers
 
 ### 2. Testnet Deployment
 
@@ -182,7 +174,8 @@ Before deploying to production:
 
 The bot includes built-in logging and optional Slack notifications:
 
-1. Configure `SLACK_TOKEN` and `SLACK_CHANNEL` in your `.env` file
+1. Configure Slack settings in the network configuration files:
+   - Set `token` and `channel` in the `notifications.slack` section
 2. The bot will send notifications for:
    - Successful rebalancing operations
    - Failed operations
@@ -198,7 +191,7 @@ Common issues and solutions:
 3. **"Subsidy below minimum"**: Adjust minimum subsidy thresholds
 4. **Contract call failures**: Verify contract addresses and network connectivity
 
-For detailed logs, set `LOG_LEVEL=debug` in your environment.
+For detailed logs, set the `logLevel` to "debug" in the network configuration files.
 
 ## License
 
