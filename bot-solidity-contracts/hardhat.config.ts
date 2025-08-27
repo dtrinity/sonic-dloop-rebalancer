@@ -6,8 +6,11 @@ import "hardhat-deploy";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import { HardhatUserConfig } from "hardhat/config";
-import { SONIC_MAINNET_CONFIG } from "./config/networks/sonic_mainnet";
-import { SONIC_TESTNET_CONFIG } from "./config/networks/sonic_testnet";
+import { getEnvPrivateKeys } from "./typescript/named-accounts";
+
+import dotenv from "dotenv";
+
+dotenv.config({ path: ".env" });
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -24,16 +27,17 @@ const config: HardhatUserConfig = {
       chainId: 1337,
     },
     sonic_mainnet: {
-      url: SONIC_MAINNET_CONFIG.network.rpcUrl,
-      accounts: SONIC_MAINNET_CONFIG.network.privateKey ? [SONIC_MAINNET_CONFIG.network.privateKey] : [],
+      url: "https://rpc.soniclabs.com",
+      saveDeployments: true,
+      deploy: ["deploy"],
+      accounts: getEnvPrivateKeys("sonic_mainnet"),
     },
     sonic_testnet: {
-      url: SONIC_TESTNET_CONFIG.network.rpcUrl,
-      accounts: SONIC_TESTNET_CONFIG.network.privateKey ? [SONIC_TESTNET_CONFIG.network.privateKey] : [],
+      url: "https://rpc.sonic.fantom.network",
+      saveDeployments: true,
+      deploy: ["deploy-mocks", "deploy"],
+      accounts: getEnvPrivateKeys("sonic_testnet"),
     },
-  },
-  etherscan: {
-    apiKey: SONIC_MAINNET_CONFIG.blockExplorer.apiKey,
   },
   gasReporter: {
     enabled: false,

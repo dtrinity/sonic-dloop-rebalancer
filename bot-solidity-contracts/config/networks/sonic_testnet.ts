@@ -1,5 +1,4 @@
 export const SONIC_TESTNET_CONFIG = {
-  chainId: 64165, // Sonic testnet chain ID
   name: "sonic_testnet",
 
   contracts: {
@@ -9,9 +8,6 @@ export const SONIC_TESTNET_CONFIG = {
     decreaseOdos: "0x0000000000000000000000000000000000000000",
     odosRouter: "0x0000000000000000000000000000000000000000",
     flashLender: "0x0000000000000000000000000000000000000000",
-
-    // Your deployed contracts (update after deployment)
-    yourBotContract: "0x0000000000000000000000000000000000000000",
   },
 
   deployment: {
