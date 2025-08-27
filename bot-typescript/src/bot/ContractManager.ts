@@ -1,13 +1,33 @@
 import { ethers } from "ethers";
 
 import { BotConfig } from "../config/types";
-import { IDLoopCore__factory } from "../../../bot-solidity-contracts/typechain-types/factories/IDLoopCore__factory";
-import { IIncreaseLeverageOdos__factory } from "../../../bot-solidity-contracts/typechain-types/factories/IIncreaseLeverageOdos__factory";
-import { IDecreaseLeverageOdos__factory } from "../../../bot-solidity-contracts/typechain-types/factories/IDecreaseLeverageOdos__factory";
-import { IFlashLender__factory } from "../../../bot-solidity-contracts/typechain-types/factories/IFlashLender__factory";
+
+// ABI definitions for contracts
+const IDLoopCoreABI = [
+  "function quoteRebalanceAmountToReachTargetLeverage() view returns (uint256, uint256, int8)",
+  "function getCurrentSubsidyBps() view returns (uint256)",
+  "function getCurrentLeverageBps() view returns (uint256)",
+  "function collateralToken() view returns (address)",
+  "function debtToken() view returns (address)",
+  "function convertFromTokenAmountToBaseCurrency(uint256 amount, address token) view returns (uint256)",
+  "function convertFromBaseCurrencyToToken(uint256 amount, address token) view returns (uint256)"
+];
+
+const IIncreaseLeverageOdosABI = [
+  "function increaseLeverage(uint256 rebalanceCollateralAmount, bytes swapData, address dLoopCore) returns (uint256)"
+];
+
+const IDecreaseLeverageOdosABI = [
+  "function decreaseLeverage(uint256 rebalanceDebtAmount, bytes swapData, address dLoopCore) returns (uint256)"
+];
+
+const IFlashLenderABI = [
+  "function maxFlashLoan(address token) view returns (uint256)",
+  "function flashFee(address token, uint256 amount) view returns (uint256)"
+];
 
 // Typed contract interfaces for better type safety
-export interface DLoopCoreContract extends ethers.Contract {
+export interface DLoopCoreContract {
   quoteRebalanceAmountToReachTargetLeverage(): Promise<
     [bigint, bigint, number]
   >;
@@ -25,7 +45,7 @@ export interface DLoopCoreContract extends ethers.Contract {
   ): Promise<bigint>;
 }
 
-export interface IncreaseLeverageContract extends ethers.Contract {
+export interface IncreaseLeverageContract {
   increaseLeverage(
     rebalanceCollateralAmount: bigint,
     swapData: string,
@@ -33,7 +53,7 @@ export interface IncreaseLeverageContract extends ethers.Contract {
   ): Promise<ethers.ContractTransactionResponse>;
 }
 
-export interface DecreaseLeverageContract extends ethers.Contract {
+export interface DecreaseLeverageContract {
   decreaseLeverage(
     rebalanceDebtAmount: bigint,
     swapData: string,
@@ -41,7 +61,7 @@ export interface DecreaseLeverageContract extends ethers.Contract {
   ): Promise<ethers.ContractTransactionResponse>;
 }
 
-export interface FlashLenderContract extends ethers.Contract {
+export interface FlashLenderContract {
   maxFlashLoan(token: string): Promise<bigint>;
   flashFee(token: string, amount: bigint): Promise<bigint>;
 }
@@ -58,25 +78,29 @@ export class ContractManager {
     private readonly config: BotConfig,
   ) {
     // Create contract instances with minimal ABIs
-    this.core = IDLoopCore__factory.connect(
+    this.core = new ethers.Contract(
       config.contracts.dloopCore,
+      IDLoopCoreABI,
       provider,
-    ) as DLoopCoreContract;
+    ) as unknown as DLoopCoreContract;
 
-    this.increaseOdos = IIncreaseLeverageOdos__factory.connect(
+    this.increaseOdos = new ethers.Contract(
       config.contracts.increaseOdos,
+      IIncreaseLeverageOdosABI,
       signer,
-    ) as IncreaseLeverageContract;
+    ) as unknown as IncreaseLeverageContract;
 
-    this.decreaseOdos = IDecreaseLeverageOdos__factory.connect(
+    this.decreaseOdos = new ethers.Contract(
       config.contracts.decreaseOdos,
+      IDecreaseLeverageOdosABI,
       signer,
-    ) as DecreaseLeverageContract;
+    ) as unknown as DecreaseLeverageContract;
 
-    this.flashLender = IFlashLender__factory.connect(
+    this.flashLender = new ethers.Contract(
       config.contracts.flashLender,
+      IFlashLenderABI,
       provider,
-    ) as FlashLenderContract;
+    ) as unknown as FlashLenderContract;
   }
 
   static async create(config: BotConfig): Promise<ContractManager> {
