@@ -5,10 +5,9 @@ import "@typechain/hardhat";
 import "hardhat-deploy";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
-import * as dotenv from "dotenv";
 import { HardhatUserConfig } from "hardhat/config";
-
-dotenv.config();
+import { SONIC_MAINNET_CONFIG } from "./config/networks/sonic_mainnet";
+import { SONIC_TESTNET_CONFIG } from "./config/networks/sonic_testnet";
 
 const config: HardhatUserConfig = {
   solidity: {
@@ -25,19 +24,19 @@ const config: HardhatUserConfig = {
       chainId: 1337,
     },
     sonic_mainnet: {
-      url: process.env.SONIC_MAINNET_RPC_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: SONIC_MAINNET_CONFIG.network.rpcUrl,
+      accounts: SONIC_MAINNET_CONFIG.network.privateKey ? [SONIC_MAINNET_CONFIG.network.privateKey] : [],
     },
     sonic_testnet: {
-      url: process.env.SONIC_TESTNET_RPC_URL || "",
-      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
+      url: SONIC_TESTNET_CONFIG.network.rpcUrl,
+      accounts: SONIC_TESTNET_CONFIG.network.privateKey ? [SONIC_TESTNET_CONFIG.network.privateKey] : [],
     },
   },
   etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY || "",
+    apiKey: SONIC_MAINNET_CONFIG.blockExplorer.apiKey,
   },
   gasReporter: {
-    enabled: process.env.REPORT_GAS !== undefined,
+    enabled: false,
     currency: "USD",
   },
   namedAccounts: {
