@@ -14,14 +14,16 @@
     "@nomicfoundation/hardhat-ethers": "^3.0.0",
     "@nomicfoundation/hardhat-toolbox": "^4.0.0",
     "@nomicfoundation/hardhat-verify": "^2.0.0",
+    "@openzeppelin/contracts": "^5.2.0",
     "@typechain/hardhat": "^9.1.0",
+    "dotenv": "^17.2.1",
     "hardhat": "^2.19.0",
     "hardhat-deploy": "^0.11.0",
     "prettier": "^3.5.0",
     "prettier-plugin-solidity": "^1.4.2",
     "solhint": "^5.0.5",
     "solidity-coverage": "^0.8.14",
-    "typescript": "^5.7.3",
-    "@openzeppelin/contracts": "^5.2.0"
+    "ts-node": "^10.9.2",
+    "typescript": "^5.7.3"
   }
 }
