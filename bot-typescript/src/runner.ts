@@ -2,6 +2,7 @@ import { ContractManager } from "./bot/ContractManager";
 import { RebalanceManager } from "./bot/RebalanceManager";
 import { FileCache } from "./common/cache";
 import { logger } from "./common/log";
+import { getChainIdFromRpc } from "./common/network";
 import { sanitizeError } from "./common/sanitize";
 import { getConfig } from "./config/config";
 import { IGNORE_DURATION_MS } from "./config/constants";
@@ -19,10 +20,14 @@ class RebalanceBotRunner {
     "ignoreMemory.json",
   );
   private isRunning = false;
+  private chainId?: number;
 
   async initialize(): Promise<void> {
+    // Get chainId from rpcUrl
+    this.chainId = await getChainIdFromRpc(this.config.network.rpcUrl);
+
     logger.info("Initializing DLoop Rebalancer Bot", {
-      network: this.config.network.chainId,
+      network: this.chainId,
       core: this.config.contracts.dloopCore,
       dryRun: this.config.policy.dryRun || false,
     });

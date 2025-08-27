@@ -1,6 +1,7 @@
 export interface NetworkConfig {
-  chainId: number;
   rpcUrl: string;
+  odosApiUrl: string;
+  chainId: number;
   privateKey?: string;
 }
 

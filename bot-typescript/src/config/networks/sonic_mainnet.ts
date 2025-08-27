@@ -15,8 +15,9 @@ export const SONIC_MAINNET_CONFIG: {
   notifications: NotificationsConfig;
 } = {
   network: {
-    chainId: 1717, // Sonic mainnet chain ID
-    rpcUrl: "",
+    rpcUrl: "https://rpc.soniclabs.com",
+    odosApiUrl: "https://api.odos.xyz",
+    chainId: 146,
     privateKey: "",
   },
   contracts: {

@@ -15,8 +15,9 @@ export const SONIC_TESTNET_CONFIG: {
   notifications: NotificationsConfig;
 } = {
   network: {
-    chainId: 64165, // Sonic testnet chain ID
-    rpcUrl: "",
+    rpcUrl: "https://rpc.sonic.fantom.network",
+    odosApiUrl: "https://api.odos.xyz",
+    chainId: 1946,
     privateKey: "",
   },
   contracts: {

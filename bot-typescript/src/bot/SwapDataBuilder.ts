@@ -17,7 +17,7 @@ export class SwapDataBuilder {
     private readonly config: BotConfig,
   ) {
     this.odosClient = new OdosClient(
-      "https://api.odos.xyz",
+      config.network.odosApiUrl,
       config.network.chainId,
     );
   }
