@@ -49,6 +49,7 @@ export default [
       "src/**/*.ts",
       "src/**/*.js",
       "test/**/*.ts",
+      "test/*.ts",
       "config/**/*.ts",
       "config/**/*.js",
     ],
