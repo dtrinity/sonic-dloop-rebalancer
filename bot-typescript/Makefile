@@ -1,4 +1,4 @@
-.PHONY: install build test lint clean run
+.PHONY: install build test test-coverage lint clean run
 
 # Install dependencies
 install:
@@ -11,6 +11,10 @@ build:
 # Run tests
 test:
 	yarn test
+
+# Run tests with coverage
+test-coverage:
+	yarn test --coverage
 
 # Run linter
 lint:
@@ -36,12 +40,13 @@ all: prepare check
 
 help:
 	@echo "Available commands:"
-	@echo "  make install     - Install dependencies"
-	@echo "  make build       - Build the project"
-	@echo "  make test        - Run tests"
-	@echo "  make lint        - Run linter"
-	@echo "  make clean       - Clean build artifacts"
-	@echo "  make run         - Run the bot"
-	@echo "  make prepare     - Install dependencies and build"
-	@echo "  make check       - Run all checks"
-	@echo "  make all         - Install dependencies, build, and run checks"
+	@echo "  make install        - Install dependencies"
+	@echo "  make build          - Build the project"
+	@echo "  make test           - Run tests"
+	@echo "  make test-coverage  - Run tests with coverage"
+	@echo "  make lint           - Run linter"
+	@echo "  make clean          - Clean build artifacts"
+	@echo "  make run            - Run the bot"
+	@echo "  make prepare        - Install dependencies and build"
+	@echo "  make check          - Run all checks"
+	@echo "  make all            - Install dependencies, build, and run checks"

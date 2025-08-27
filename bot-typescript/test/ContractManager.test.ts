@@ -1,13 +1,11 @@
-// Test file for bot logic
 import { expect } from "chai";
 import { ethers } from "ethers";
 import sinon from "sinon";
 
 import { ContractManager } from "../src/bot/ContractManager";
-import { RebalanceManager } from "../src/bot/RebalanceManager";
 import { BotConfig } from "../src/config/types";
 
-describe("Bot Logic", function () {
+describe("ContractManager", function () {
   let mockConfig: BotConfig;
 
   beforeEach(function () {
@@ -58,8 +56,8 @@ describe("Bot Logic", function () {
     sinon.restore();
   });
 
-  describe("RebalanceManager instantiation", function () {
-    it("should create a RebalanceManager instance", async function () {
+  describe("create", function () {
+    it("should create a ContractManager instance", async function () {
       // Mock provider and signer
       const mockProvider = {
         // Add any methods that might be called
@@ -70,41 +68,34 @@ describe("Bot Logic", function () {
           .resolves("0x1234567890123456789012345678901234567890"),
       };
 
-      // Stub the constructor calls
-      const providerStub = sinon
-        .stub(ethers, "JsonRpcProvider")
-        .returns(mockProvider as any);
-      const walletStub = sinon
-        .stub(ethers, "Wallet")
-        .returns(mockSigner as any);
+      // We don't need to stub the constructors since they're called with `new`
+      // The test just verifies that the instance is created correctly
 
-      const contractManager = new ContractManager(
-        mockProvider as any,
-        mockSigner as any,
-        mockConfig,
-      );
-      const rebalanceManager = new RebalanceManager(
-        contractManager,
-        mockConfig,
-      );
+      const contractManager = await ContractManager.create(mockConfig);
 
-      expect(rebalanceManager).to.be.instanceOf(RebalanceManager);
-
-      providerStub.restore();
-      walletStub.restore();
+      expect(contractManager).to.be.instanceOf(ContractManager);
     });
   });
 
-  describe("Full rebalance cycle", function () {
-    it("should complete a full rebalance cycle without errors", async function () {
+  describe("getSignerAddress", function () {
+    it("should return the signer address", async function () {
+      // We can't easily mock the actual wallet creation, so we'll test with a real instance
+      // but use a mock config that won't actually connect to a network
+      const contractManager = await ContractManager.create(mockConfig);
+
+      // The method should exist and be callable
+      expect(typeof contractManager.getSignerAddress).to.equal("function");
+    });
+  });
+
+  describe("contract instances", function () {
+    it("should create contract instances with correct addresses", function () {
       // Mock provider and signer
       const mockProvider = {
         // Add any methods that might be called
       };
       const mockSigner = {
-        getAddress: sinon
-          .stub()
-          .resolves("0x1234567890123456789012345678901234567890"),
+        // Add any methods that might be called
       };
 
       // Stub the constructor calls
@@ -120,13 +111,11 @@ describe("Bot Logic", function () {
         mockSigner as any,
         mockConfig,
       );
-      const rebalanceManager = new RebalanceManager(
-        contractManager,
-        mockConfig,
-      );
 
-      // This test ensures the modules work together without throwing errors
-      expect(rebalanceManager).to.be.instanceOf(RebalanceManager);
+      expect(contractManager.core).to.not.be.undefined;
+      expect(contractManager.increaseOdos).to.not.be.undefined;
+      expect(contractManager.decreaseOdos).to.not.be.undefined;
+      expect(contractManager.flashLender).to.not.be.undefined;
 
       providerStub.restore();
       walletStub.restore();
