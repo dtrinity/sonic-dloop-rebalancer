@@ -3,8 +3,6 @@ node_modules/
 
 # Build outputs
 dist/
-build/
-out/
 
 # Environment variables
 .env
@@ -30,3 +28,6 @@ Thumbs.db
 # Temporary files
 tmp/
 temp/
+
+# Coverage reports
+coverage/

@@ -2,9 +2,9 @@
 node_modules/
 
 # Build outputs
-dist/
-build/
-out/
+artifacts/
+cache/
+typechain-types/
 
 # Environment variables
 .env
@@ -26,6 +26,10 @@ Thumbs.db
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Hardhat files
+coverage/
+coverage.json
 
 # Temporary files
 tmp/

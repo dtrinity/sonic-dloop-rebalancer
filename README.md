@@ -1,183 +1,205 @@
 # DLoop Rebalancer Bot
 
-A TypeScript bot that automatically rebalances DLoop vaults to maintain target leverage ratios using Odos swap routing and flash loans.
+This repository contains the implementation of a DeFi bot that automatically rebalances DLoop vaults to maintain target leverage ratios using Odos swap routing and flash loans.
 
-## Overview
+## Repository Structure
 
-This bot monitors DLoop core contracts and executes rebalancing operations when the current leverage deviates from the target leverage. It uses the existing deployed periphery contracts (`DLoopIncreaseLeverageOdos` and `DLoopDecreaseLeverageOdos`) to perform the rebalancing operations.
+This repository contains two independent sub-repositories:
 
-## Features
+1. `bot-solidity-contracts` - Contains the Solidity smart contract interfaces for interacting with DLoop protocol
+2. `bot-typescript` - Contains the TypeScript bot logic that orchestrates the rebalancing operations
 
-- **Automatic Rebalancing**: Monitors leverage and rebalances when needed
-- **Subsidy Gating**: Only executes profitable rebalancing operations
-- **Fallback Strategy**: Tries multiple percentage amounts (100%, 90%, 80%, etc.) if initial attempts fail
-- **Flash Loan Integration**: Uses ERC-3156 flash loans for capital efficiency
-- **Odos Integration**: Leverages Odos for optimal swap routing
-- **Slack Notifications**: Sends success/failure notifications to Slack
-- **Dry Run Mode**: Test mode for safe deployment
-- **Docker Support**: Containerized deployment with Docker
+Each sub-repository is completely independent and can be moved outside this repository if needed.
 
-## Architecture
+## Prerequisites
 
-```text
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
-│   Bot Runner    │────│  RebalanceManager│────│   QuoteManager      │
-└─────────────────┘    └──────────────────┘    └─────────────────────┘
-         │                       │                        │
-         │              ┌──────────────────┐    ┌─────────────────────┐
-         │              │  SwapDataBuilder │────│    OdosClient       │
-         │              └──────────────────┘    └─────────────────────┘
-         │
-┌─────────────────┐    ┌──────────────────┐    ┌─────────────────────┐
-│ ContractManager │────│ NotificationMgr  │────│   Slack Client      │
-└─────────────────┘    └──────────────────┘    └─────────────────────┘
-```
+- Node.js (v18.x recommended)
+- Yarn (v1.22.x recommended)
+- Docker (for containerized deployment)
 
-## Installation
+## Quick Start
+
+1. Install dependencies for both sub-repos:
+
+   ```bash
+   make install
+   ```
+
+2. Compile the Solidity contracts:
+
+   ```bash
+   make compile
+   ```
+
+3. Run tests:
+
+   ```bash
+   make test
+   ```
+
+## Development
+
+### Solidity Contracts
+
+Navigate to the `bot-solidity-contracts` directory for contract development:
 
 ```bash
-# Install dependencies
-npm install
-
-# Compile contracts
-npx hardhat compile
-
-# Run tests
-npx hardhat test
+cd bot-solidity-contracts
 ```
+
+- Compile contracts: `yarn compile`
+- Run tests: `yarn test`
+- Deploy contracts: `yarn deploy:testnet`
+
+### TypeScript Bot
+
+Navigate to the `bot-typescript` directory for bot development:
+
+```bash
+cd bot-typescript
+```
+
+- Build TypeScript: `yarn build`
+- Run tests: `yarn test`
+- Run bot: `yarn start`
 
 ## Configuration
 
-Copy the example environment file and configure:
+### Environment Variables
 
-```bash
-make .env
-```
+Copy the `.env.example` files in each sub-repo and fill in the required values:
 
-Key configuration options:
+1. For contract deployment (`bot-solidity-contracts/.env`):
+   - `PRIVATE_KEY`: Your wallet private key for contract deployment
+   - `SONIC_MAINNET_RPC_URL`: RPC URL for Sonic mainnet
+   - `SONIC_TESTNET_RPC_URL`: RPC URL for Sonic testnet
+   - `SONICSCAN_API_KEY`: API key for SonicScan block explorer
+   - Contract addresses for existing contracts
 
-- `NETWORK`: Target network (localhost, sonic_testnet, sonic_mainnet)
-- `DLOOP_CORE_ADDRESS`: Address of the DLoop core contract
-- `INCREASE_ODOS_ADDRESS`: Address of the increase leverage periphery
-- `DECREASE_ODOS_ADDRESS`: Address of the decrease leverage periphery
-- `ODOS_ROUTER_ADDRESS`: Odos router address (if supported on network)
-- `FLASH_LENDER_ADDRESS`: ERC-3156 flash lender address
-- `MIN_SUBSIDY_*`: Minimum subsidy thresholds for profitability
-- `EXACT_OUT_INPUT_CAP_BPS`: Input cap for exact-output swaps (10000-50000, default 15000 = 150%)
-- `SLACK_TOKEN`: Slack bot token for notifications
-- `DRY_RUN`: Set to "true" for testing without real transactions
+2. For bot execution (`bot-typescript/.env`):
+   - `PRIVATE_KEY`: Your wallet private key for bot operations
+   - `SONIC_MAINNET_RPC_URL`: RPC URL for Sonic mainnet
+   - `SONIC_TESTNET_RPC_URL`: RPC URL for Sonic testnet
+   - `SLACK_TOKEN` (optional): Slack API token for notifications
+   - `SLACK_CHANNEL` (optional): Slack channel for notifications
+   - Contract addresses for all required contracts
+   - Token configuration (addresses, decimals, symbols)
+   - Bot parameters (network, loop interval, dry run mode)
+   - Minimum subsidy amounts for profitability checks
+   - Rebalance percentage list for fallback strategy
+   - Transaction retry configuration
+   - Odos integration parameters
 
-## Usage
+## Deployment
 
-### Local Development
+### 1. Configure Environment Variables
 
-```bash
-# Run the bot locally
-npm run ts-node typescript/rebalance_bot/run.ts
-```
+1. Copy and configure environment files:
+   ```bash
+   cp bot-solidity-contracts/.env.example bot-solidity-contracts/.env
+   cp bot-typescript/.env.example bot-typescript/.env
+   ```
 
-### Docker Deployment
+2. Fill in all required values in both `.env` files
 
-```bash
-# Build Docker image
-make docker.build
+### 2. Testnet Deployment
 
-# Run as daemon
-make docker.run.daemon
+1. Deploy contracts to testnet (if needed):
+   ```bash
+   make deploy-contracts.testnet
+   ```
 
-# View logs
-docker logs -f dloop-rebalancer
+2. Run the TypeScript bot on testnet:
+   ```bash
+   make run.testnet
+   ```
 
-# Stop daemon
-make docker.stop
-```
+### 3. Mainnet Deployment
 
-## How It Works
+1. Deploy contracts to mainnet (if needed):
+   ```bash
+   make deploy-contracts.mainnet
+   ```
 
-1. **Quote Phase**: Calls `dloopCore.quoteRebalanceAmountToReachTargetLeverage()` to get:
-   - Input token amount
-   - Estimated output token amount  
-   - Direction (1 = increase, -1 = decrease, 0 = no rebalance)
+2. Run the TypeScript bot on mainnet:
+   ```bash
+   make run.mainnet
+   ```
 
-2. **Subsidy Gate**: Calculates expected subsidy and compares against minimum thresholds
+## Docker Deployment
 
-3. **Execution Phase**:
-   - **Increase Leverage**: Flash loans debt tokens → swap to collateral → call `increaseLeverage()` → repay loan
-   - **Decrease Leverage**: Flash loans debt tokens → call `decreaseLeverage()` → swap collateral to debt → repay loan
+1. Build Docker image:
 
-4. **Fallback Strategy**: If execution fails, retries with smaller amounts (90%, 80%, etc.)
+   For AMD64 (Intel/AMD):
+   ```bash
+   make docker.build.amd64
+   ```
 
-5. **Notification**: Sends results to Slack and logs
+   For ARM64 (Apple Silicon):
+   ```bash
+   make docker.build.arm64
+   ```
+
+2. Run Docker container:
+
+   Testnet:
+   ```bash
+   make docker.run.testnet
+   ```
+
+   Mainnet:
+   ```bash
+   make docker.run.mainnet
+   ```
 
 ## Testing
 
-The bot includes comprehensive tests covering:
-
-- Quote manager functionality
-- Subsidy gating logic
-- Rebalancing execution flows
-- Error handling and fallback strategies
-- Integration scenarios
-
+Run all tests:
 ```bash
-# Run all tests
-npx hardhat test
-
-# Run specific test suites
-npx hardhat test --grep "QuoteManager"
-npx hardhat test --grep "RebalanceManager"
-npx hardhat test --grep "Integration"
+make test
 ```
 
-## Monitoring
+Run tests for specific components:
+```bash
+# Solidity contracts
+cd bot-solidity-contracts && yarn test
 
-The bot provides detailed logging and Slack notifications:
+# TypeScript bot
+cd bot-typescript && yarn test
+```
 
-- **Success**: Direction, percentage used, amounts, transaction hash, gas used
-- **Failures**: Error messages, retry attempts, final outcomes
-- **Skips**: Reasons for skipping (no rebalance needed, low subsidy, etc.)
+## Security
 
-## Safety Features
+Before deploying to production:
 
-- **Flash Loan Precheck**: Validates flash loan availability before execution
-- **Slippage Protection**: Uses exact-output swaps with reasonable buffers
-- **Percentage Fallback**: Reduces amounts if initial attempts fail
-- **Ignore Cache**: Prevents spam by caching recent failures
-- **Dry Run Mode**: Test execution without real transactions
+1. Conduct a thorough security review of the smart contracts and bot logic
+2. Use a separate wallet with limited funds for the bot
+3. Never commit private keys or sensitive data to version control
+4. Regularly monitor bot operations and transactions
+5. Set appropriate minimum subsidy thresholds to ensure profitability
 
-## Network Support
+## Monitoring and Alerts
 
-- **Sonic Mainnet**: Full Odos support
-- **Sonic Testnet**: Limited (no Odos support)
-- **Localhost**: For development and testing
+The bot includes built-in logging and optional Slack notifications:
 
-## Deployment Checklist
-
-1. ✅ Configure environment variables
-2. ✅ Set appropriate minimum subsidy thresholds
-3. ✅ Test with dry run mode first
-4. ✅ Verify contract addresses are correct
-5. ✅ Ensure sufficient gas tokens for operations
-6. ✅ Set up Slack notifications
-7. ✅ Monitor initial runs closely
+1. Configure `SLACK_TOKEN` and `SLACK_CHANNEL` in your `.env` file
+2. The bot will send notifications for:
+   - Successful rebalancing operations
+   - Failed operations
+   - Skipped operations
+   - Critical errors
 
 ## Troubleshooting
 
-**Common Issues:**
+Common issues and solutions:
 
-- **"Invalid chain ID"**: Odos not supported on this network
-- **"Flash loan capacity exceeded"**: Reduce percentage list or check flash lender
-- **"Subsidy below minimum"**: Adjust minimum subsidy thresholds
-- **Contract call failures**: Verify contract addresses and network connectivity
+1. **"Invalid chain ID"**: Ensure you're using the correct network configuration
+2. **"Flash loan capacity exceeded"**: Reduce percentage list or check flash lender
+3. **"Subsidy below minimum"**: Adjust minimum subsidy thresholds
+4. **Contract call failures**: Verify contract addresses and network connectivity
 
-**Debug Mode:**
-Set `LOG_LEVEL=debug` for detailed execution logs.
+For detailed logs, set `LOG_LEVEL=debug` in your environment.
 
-## Architecture Decisions
+## License
 
-- **Standalone Design**: Bot is portable and doesn't depend on parent repo
-- **TypeScript Runtime**: Uses ts-node for simpler deployment than compiled JS
-- **Docker-First**: Designed for containerized production deployment
-- **Minimal Interfaces**: Only includes necessary contract interfaces for smaller footprint
-- **Error-First**: Comprehensive error handling and graceful failure recovery
-- **High-Precision Math**: Uses 9-decimal place precision (1,000,000,000n) for percentage calculations to avoid rounding errors across small trial percentages while keeping all math in integers
+MIT
