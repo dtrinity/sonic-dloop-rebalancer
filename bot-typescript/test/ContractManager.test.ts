@@ -58,19 +58,6 @@ describe("ContractManager", function () {
 
   describe("create", function () {
     it("should create a ContractManager instance", async function () {
-      // Mock provider and signer
-      const mockProvider = {
-        // Add any methods that might be called
-      };
-      const mockSigner = {
-        getAddress: sinon
-          .stub()
-          .resolves("0x1234567890123456789012345678901234567890"),
-      };
-
-      // We don't need to stub the constructors since they're called with `new`
-      // The test just verifies that the instance is created correctly
-
       const contractManager = await ContractManager.create(mockConfig);
 
       expect(contractManager).to.be.instanceOf(ContractManager);
