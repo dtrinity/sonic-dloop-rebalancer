@@ -128,13 +128,15 @@ Before deploying with Docker, ensure you have:
    ```bash
    cd bot-typescript
    cp env-example.txt .env
-   # Edit .env with your configuration
+   # Edit .env with your configuration (especially NETWORK and PRIVATE_KEY)
    ```
 
-2. **Required Environment Variables**:
+2. **Required Environment Variables in .env**:
    - `NETWORK`: Choose `sonic_mainnet` or `sonic_testnet`
    - `PRIVATE_KEY`: Your wallet private key (keep secure!)
-   - `NODE_ENV`: Set to `production`
+   - `NODE_ENV`: Will be set to `production` by default
+
+   > **Security Note**: The .env file is mounted as a volume at runtime rather than copied into the Docker image. This ensures sensitive information like private keys are never baked into the Docker image layers.
 
 ### Docker Commands
 

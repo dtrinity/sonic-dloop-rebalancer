@@ -1,5 +1,5 @@
 # Build stage
-FROM node:18-alpine AS builder
+FROM node:20-alpine AS builder
 
 WORKDIR /app
 
@@ -16,7 +16,7 @@ COPY . .
 RUN yarn build
 
 # Production stage
-FROM node:18-alpine AS production
+FROM node:20-alpine AS production
 
 WORKDIR /app
 
@@ -32,9 +32,6 @@ RUN yarn install --frozen-lockfile --production
 # Copy built application
 COPY --from=builder /app/dist ./dist
 
-# Copy environment file template (if exists)
-COPY .env* ./
-
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S botuser -u 1001
@@ -48,10 +45,8 @@ USER botuser
 # Expose port (if needed)
 # EXPOSE 3000
 
-# Environment variables
+# Default environment variables (can be overridden at runtime)
 ENV NODE_ENV=production
-ENV NETWORK=""
-ENV PRIVATE_KEY=""
 
 # Health check - verify the bot process is running
 HEALTHCHECK --interval=60s --timeout=10s --start-period=30s --retries=3 \

@@ -62,7 +62,11 @@ docker.run:
 		echo "Error: network must be 'mainnet' or 'testnet'"; \
 		exit 1; \
 	fi; \
-	docker run --name dloop-rebalancer-bot --env-file .env -e NETWORK=$$NETWORK -v $$(pwd)/cache:/app/cache --rm dloop-rebalancer
+	if [ ! -f .env ]; then \
+		echo "Error: .env file not found. Please copy env-example.txt to .env and configure it."; \
+		exit 1; \
+	fi; \
+	docker run --name dloop-rebalancer-bot -e NETWORK=$$NETWORK -v $$(pwd)/.env:/app/.env -v $$(pwd)/cache:/app/cache --rm dloop-rebalancer
 
 docker.stop:
 	@echo "Stopping Docker container..."
