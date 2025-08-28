@@ -120,7 +120,25 @@ All configuration values are now hardcoded in the network configuration files:
 
 ## Docker Deployment
 
-1. Build Docker image:
+### Prerequisites
+
+Before deploying with Docker, ensure you have:
+
+1. **Environment Configuration**: Copy the environment template and configure your settings:
+   ```bash
+   cd bot-typescript
+   cp env-example.txt .env
+   # Edit .env with your configuration
+   ```
+
+2. **Required Environment Variables**:
+   - `NETWORK`: Choose `sonic_mainnet` or `sonic_testnet`
+   - `PRIVATE_KEY`: Your wallet private key (keep secure!)
+   - `NODE_ENV`: Set to `production`
+
+### Docker Commands
+
+1. **Build Docker image**:
 
    For AMD64 (Intel/AMD):
    ```bash
@@ -132,7 +150,13 @@ All configuration values are now hardcoded in the network configuration files:
    make docker.build.arm64
    ```
 
-2. Run Docker container:
+   Or build for your current platform:
+   ```bash
+   cd bot-typescript
+   make docker.build
+   ```
+
+2. **Run Docker container**:
 
    Testnet:
    ```bash
@@ -142,6 +166,13 @@ All configuration values are now hardcoded in the network configuration files:
    Mainnet:
    ```bash
    make docker.run.mainnet
+   ```
+
+3. **Additional Docker commands**:
+   ```bash
+   cd bot-typescript
+   make docker.stop          # Stop the container
+   make docker.logs          # View container logs
    ```
 
 ## Testing
