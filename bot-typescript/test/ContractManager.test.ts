@@ -20,18 +20,9 @@ describe("ContractManager", function () {
       },
       contracts: {
         dloopCore: "0x1111111111111111111111111111111111111111",
+        dloopQuoter: "0x9999999999999999999999999999999999999999",
         increaseOdos: "0x2222222222222222222222222222222222222222",
         decreaseOdos: "0x3333333333333333333333333333333333333333",
-        flashLender: "0x4444444444444444444444444444444444444444",
-        odosRouter: "0x7777777777777777777777777777777777777777",
-      },
-      tokens: {
-        collateral: {
-          address: "0x5555555555555555555555555555555555555555",
-        },
-        debt: {
-          address: "0x6666666666666666666666666666666666666666",
-        },
       },
       policy: {
         rebalancePercentageList: [0.1, 0.5, 1.0],
@@ -98,7 +89,7 @@ describe("ContractManager", function () {
       expect(contractManager.core).to.not.be.undefined;
       expect(contractManager.increaseOdos).to.not.be.undefined;
       expect(contractManager.decreaseOdos).to.not.be.undefined;
-      expect(contractManager.flashLender).to.not.be.undefined;
+      expect(contractManager.quoter).to.not.be.undefined;
 
       providerStub.restore();
       walletStub.restore();

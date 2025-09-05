@@ -7,19 +7,13 @@ export interface NetworkConfig {
 
 export interface ContractsConfig {
   dloopCore: string;
+  dloopQuoter: string;
   increaseOdos: string;
   decreaseOdos: string;
-  odosRouter: string;
-  flashLender: string;
 }
 
 export interface TokenConfig {
   address: string;
-}
-
-export interface TokensConfig {
-  collateral: TokenConfig;
-  debt: TokenConfig;
 }
 
 export interface PolicyConfig {
@@ -41,7 +35,6 @@ export interface NotificationsConfig {
 export interface BotConfig {
   network: NetworkConfig;
   contracts: ContractsConfig;
-  tokens: TokensConfig;
   policy: PolicyConfig;
   notifications: NotificationsConfig;
 }

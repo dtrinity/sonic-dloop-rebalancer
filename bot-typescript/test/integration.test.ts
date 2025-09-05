@@ -24,18 +24,9 @@ describe("Integration Tests", function () {
       },
       contracts: {
         dloopCore: "0x1111111111111111111111111111111111111111",
+        dloopQuoter: "0x9999999999999999999999999999999999999999",
         increaseOdos: "0x2222222222222222222222222222222222222222",
         decreaseOdos: "0x3333333333333333333333333333333333333333",
-        flashLender: "0x4444444444444444444444444444444444444444",
-        odosRouter: "0x7777777777777777777777777777777777777777",
-      },
-      tokens: {
-        collateral: {
-          address: "0x5555555555555555555555555555555555555555",
-        },
-        debt: {
-          address: "0x6666666666666666666666666666666666666666",
-        },
       },
       policy: {
         rebalancePercentageList: [0.1, 0.5, 1.0],
@@ -99,7 +90,7 @@ describe("Integration Tests", function () {
         500000000000000000n,
         1,
       ];
-      contractManager.core.quoteRebalanceAmountToReachTargetLeverage = sinon
+      contractManager.quoter.quoteRebalanceAmountToReachTargetLeverage = sinon
         .stub()
         .resolves(mockQuoteResult);
       contractManager.core.getCurrentSubsidyBps = sinon.stub().resolves(100n); // 1%
@@ -109,7 +100,7 @@ describe("Integration Tests", function () {
       contractManager.core.convertFromBaseCurrencyToToken = sinon
         .stub()
         .resolves(500000000000000000n);
-      contractManager.flashLender.maxFlashLoan = sinon
+      (await contractManager.getFlashLender()).maxFlashLoan = sinon
         .stub()
         .resolves(10000000000000000000n); // 10 tokens
 
@@ -207,14 +198,14 @@ describe("Integration Tests", function () {
         500000000000000000n,
         -1,
       ];
-      contractManager.core.quoteRebalanceAmountToReachTargetLeverage = sinon
+      contractManager.quoter.quoteRebalanceAmountToReachTargetLeverage = sinon
         .stub()
         .resolves(mockQuoteResult);
       contractManager.core.getCurrentSubsidyBps = sinon.stub().resolves(100n); // 1%
-      contractManager.flashLender.flashFee = sinon
+      (await contractManager.getFlashLender()).flashFee = sinon
         .stub()
         .resolves(10000000000000000n); // 0.01 tokens
-      contractManager.flashLender.maxFlashLoan = sinon
+      (await contractManager.getFlashLender()).maxFlashLoan = sinon
         .stub()
         .resolves(10000000000000000000n); // 10 tokens
 

@@ -42,10 +42,16 @@ describe("RebalanceManager", function () {
         convertFromBaseCurrencyToToken: sinon.stub(),
         getCurrentSubsidyBps: sinon.stub(),
       },
-      flashLender: {
+      getFlashLender: sinon.stub().resolves({
         maxFlashLoan: sinon.stub(),
         flashFee: sinon.stub(),
-      },
+      }),
+      getDebtTokenAddress: sinon
+        .stub()
+        .resolves("0x6666666666666666666666666666666666666666"),
+      getCollateralTokenAddress: sinon
+        .stub()
+        .resolves("0x5555555555555555555555555555555555555555"),
       increaseOdos: {
         increaseLeverage: sinon.stub(),
       },
@@ -68,18 +74,9 @@ describe("RebalanceManager", function () {
       },
       contracts: {
         dloopCore: "0x1111111111111111111111111111111111111111",
+        dloopQuoter: "0x9999999999999999999999999999999999999999",
         increaseOdos: "0x2222222222222222222222222222222222222222",
         decreaseOdos: "0x3333333333333333333333333333333333333333",
-        flashLender: "0x4444444444444444444444444444444444444444",
-        odosRouter: "0x7777777777777777777777777777777777777777",
-      },
-      tokens: {
-        collateral: {
-          address: "0x5555555555555555555555555555555555555555",
-        },
-        debt: {
-          address: "0x6666666666666666666666666666666666666666",
-        },
       },
       policy: {
         rebalancePercentageList: [0.1, 0.5, 1.0],
@@ -330,7 +327,7 @@ describe("RebalanceManager", function () {
       mockContracts.core.convertFromBaseCurrencyToToken.resolves(
         500000000000000000n,
       );
-      mockContracts.flashLender.maxFlashLoan.resolves(10000000000000000000n); // 10 tokens
+      ;(await mockContracts.getFlashLender()).maxFlashLoan.resolves(10000000000000000000n); // 10 tokens
 
       const result = await (rebalanceManager as any).checkFlashLoanAvailability(
         mockQuote,
@@ -349,7 +346,7 @@ describe("RebalanceManager", function () {
 
       const trialAmount = 500000000000000000n;
 
-      mockContracts.flashLender.maxFlashLoan.resolves(10000000000000000000n); // 10 tokens
+      ;(await mockContracts.getFlashLender()).maxFlashLoan.resolves(10000000000000000000n); // 10 tokens
 
       const result = await (rebalanceManager as any).checkFlashLoanAvailability(
         mockQuote,
@@ -374,7 +371,7 @@ describe("RebalanceManager", function () {
       mockContracts.core.convertFromBaseCurrencyToToken.resolves(
         500000000000000000n,
       );
-      mockContracts.flashLender.maxFlashLoan.resolves(100000000000000000n); // 0.1 tokens (too small)
+      ;(await mockContracts.getFlashLender()).maxFlashLoan.resolves(100000000000000000n); // 0.1 tokens (too small)
 
       const result = await (rebalanceManager as any).checkFlashLoanAvailability(
         mockQuote,

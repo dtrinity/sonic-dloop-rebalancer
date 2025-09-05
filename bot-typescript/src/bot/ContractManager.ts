@@ -4,7 +4,6 @@ import { BotConfig } from "../config/types";
 
 // ABI definitions for contracts
 const IDLoopCoreABI = [
-  "function quoteRebalanceAmountToReachTargetLeverage() view returns (uint256, uint256, int8)",
   "function getCurrentSubsidyBps() view returns (uint256)",
   "function getCurrentLeverageBps() view returns (uint256)",
   "function collateralToken() view returns (address)",
@@ -13,12 +12,20 @@ const IDLoopCoreABI = [
   "function convertFromBaseCurrencyToToken(uint256 amount, address token) view returns (uint256)"
 ];
 
+const IDLoopQuoterABI = [
+  "function quoteRebalanceAmountToReachTargetLeverage(address dLoopCore) view returns (uint256, uint256, int8)"
+];
+
 const IIncreaseLeverageOdosABI = [
-  "function increaseLeverage(uint256 rebalanceCollateralAmount, bytes swapData, address dLoopCore) returns (uint256)"
+  "function increaseLeverage(uint256 rebalanceCollateralAmount, bytes swapData, address dLoopCore) returns (uint256)",
+  "function odosRouter() view returns (address)",
+  "function flashLender() view returns (address)"
 ];
 
 const IDecreaseLeverageOdosABI = [
-  "function decreaseLeverage(uint256 rebalanceDebtAmount, bytes swapData, address dLoopCore) returns (uint256)"
+  "function decreaseLeverage(uint256 rebalanceDebtAmount, bytes swapData, address dLoopCore) returns (uint256)",
+  "function odosRouter() view returns (address)",
+  "function flashLender() view returns (address)"
 ];
 
 const IFlashLenderABI = [
@@ -28,9 +35,6 @@ const IFlashLenderABI = [
 
 // Typed contract interfaces for better type safety
 export interface DLoopCoreContract {
-  quoteRebalanceAmountToReachTargetLeverage(): Promise<
-    [bigint, bigint, number]
-  >;
   getCurrentSubsidyBps(): Promise<bigint>;
   getCurrentLeverageBps(): Promise<bigint>;
   collateralToken(): Promise<string>;
@@ -45,12 +49,20 @@ export interface DLoopCoreContract {
   ): Promise<bigint>;
 }
 
+export interface DLoopQuoterContract {
+  quoteRebalanceAmountToReachTargetLeverage(dLoopCore: string): Promise<
+    [bigint, bigint, number]
+  >;
+}
+
 export interface IncreaseLeverageContract {
   increaseLeverage(
     rebalanceCollateralAmount: bigint,
     swapData: string,
     dLoopCore: string,
   ): Promise<ethers.ContractTransactionResponse>;
+  odosRouter(): Promise<string>;
+  flashLender(): Promise<string>;
 }
 
 export interface DecreaseLeverageContract {
@@ -59,6 +71,8 @@ export interface DecreaseLeverageContract {
     swapData: string,
     dLoopCore: string,
   ): Promise<ethers.ContractTransactionResponse>;
+  odosRouter(): Promise<string>;
+  flashLender(): Promise<string>;
 }
 
 export interface FlashLenderContract {
@@ -69,9 +83,12 @@ export interface FlashLenderContract {
 export class ContractManager {
   public readonly provider: ethers.Provider;
   public readonly core: DLoopCoreContract;
+  public readonly quoter: DLoopQuoterContract;
   public readonly increaseOdos: IncreaseLeverageContract;
   public readonly decreaseOdos: DecreaseLeverageContract;
-  public readonly flashLender: FlashLenderContract;
+  private cachedCollateralToken?: string;
+  private cachedDebtToken?: string;
+  private cachedFlashLender?: FlashLenderContract;
 
   constructor(
     provider: ethers.Provider,
@@ -86,6 +103,12 @@ export class ContractManager {
       provider,
     ) as unknown as DLoopCoreContract;
 
+    this.quoter = new ethers.Contract(
+      config.contracts.dloopQuoter,
+      IDLoopQuoterABI,
+      provider,
+    ) as unknown as DLoopQuoterContract;
+
     this.increaseOdos = new ethers.Contract(
       config.contracts.increaseOdos,
       IIncreaseLeverageOdosABI,
@@ -97,12 +120,6 @@ export class ContractManager {
       IDecreaseLeverageOdosABI,
       signer,
     ) as unknown as DecreaseLeverageContract;
-
-    this.flashLender = new ethers.Contract(
-      config.contracts.flashLender,
-      IFlashLenderABI,
-      provider,
-    ) as unknown as FlashLenderContract;
   }
 
   static async create(config: BotConfig): Promise<ContractManager> {
@@ -114,5 +131,48 @@ export class ContractManager {
 
   async getSignerAddress(): Promise<string> {
     return await (this.signer as ethers.Signer).getAddress();
+  }
+
+  async getCollateralTokenAddress(): Promise<string> {
+    if (!this.cachedCollateralToken) {
+      this.cachedCollateralToken = await this.core.collateralToken();
+    }
+    return this.cachedCollateralToken;
+  }
+
+  async getDebtTokenAddress(): Promise<string> {
+    if (!this.cachedDebtToken) {
+      this.cachedDebtToken = await this.core.debtToken();
+    }
+    return this.cachedDebtToken;
+  }
+
+  async getFlashLender(): Promise<FlashLenderContract> {
+    if (this.cachedFlashLender) {
+      return this.cachedFlashLender;
+    }
+
+    let flashLenderAddress: string | undefined;
+    try {
+      flashLenderAddress = await this.increaseOdos.flashLender();
+    } catch {}
+
+    if (!flashLenderAddress || flashLenderAddress === ethers.ZeroAddress) {
+      try {
+        flashLenderAddress = await this.decreaseOdos.flashLender();
+      } catch {}
+    }
+
+    if (!flashLenderAddress || flashLenderAddress === ethers.ZeroAddress) {
+      throw new Error("Unable to resolve flash lender address from periphery contracts");
+    }
+
+    this.cachedFlashLender = new ethers.Contract(
+      flashLenderAddress,
+      IFlashLenderABI,
+      this.provider,
+    ) as unknown as FlashLenderContract;
+
+    return this.cachedFlashLender;
   }
 }

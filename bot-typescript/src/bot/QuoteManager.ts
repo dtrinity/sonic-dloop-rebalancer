@@ -15,10 +15,12 @@ export class QuoteManager {
 
   async getRebalanceQuote(): Promise<RebalanceQuote | null> {
     try {
-      logger.debug("Getting rebalance quote from core contract");
+      logger.debug("Getting rebalance quote from quoter contract");
 
       const [inputTokenAmount, estimatedOutputTokenAmount, direction] =
-        await this.contracts.core.quoteRebalanceAmountToReachTargetLeverage();
+        await this.contracts.quoter.quoteRebalanceAmountToReachTargetLeverage(
+          this.config.contracts.dloopCore,
+        );
 
       logger.debug("Quote result:", {
         inputTokenAmount: inputTokenAmount.toString(),
@@ -52,8 +54,8 @@ export class QuoteManager {
       // Determine output token based on direction
       const outputTokenAddress =
         quote.direction === 1
-          ? this.config.tokens.debt.address
-          : this.config.tokens.collateral.address;
+          ? await this.contracts.getDebtTokenAddress()
+          : await this.contracts.getCollateralTokenAddress();
       const minSubsidyStr =
         this.config.policy.minSubsidyAmount[outputTokenAddress];
 
@@ -121,8 +123,8 @@ export class QuoteManager {
       // Determine output token based on direction
       const outputTokenAddress =
         quote.direction === 1
-          ? this.config.tokens.debt.address
-          : this.config.tokens.collateral.address;
+          ? await this.contracts.getDebtTokenAddress()
+          : await this.contracts.getCollateralTokenAddress();
       const minSubsidyStr =
         this.config.policy.minSubsidyAmount[outputTokenAddress];
 

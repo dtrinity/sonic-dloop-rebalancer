@@ -2,7 +2,6 @@
 export const ONE_HUNDRED_PERCENT_BPS = 10_000;
 
 // Swap and slippage settings
-export const DEFAULT_SLIPPAGE_BUFFER_BPS = 500; // 5% buffer for input estimation fallback
 export const DEFAULT_SLIPPAGE_LIMIT_BPS = 100; // 1% slippage limit for Odos
 export const MAX_PRICE_IMPACT_BPS = 1000; // 10% maximum price impact
 

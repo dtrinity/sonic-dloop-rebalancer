@@ -5,6 +5,7 @@ import { formatTokenAmountWithSymbol, getTokenMetadata } from "./common/erc20";
 import { logger } from "./common/log";
 import { sanitizeForLogs } from "./common/sanitize";
 import { BotConfig, RebalanceResult } from "./config/types";
+import type { ContractManager } from "./bot/ContractManager";
 
 export class NotificationManager {
   private slackClient?: WebClient;
@@ -13,6 +14,7 @@ export class NotificationManager {
   constructor(
     private readonly config: BotConfig,
     private readonly provider: ethers.Provider,
+    private readonly contracts: ContractManager,
   ) {
     if (config.notifications.slack) {
       this.slackClient = new WebClient(config.notifications.slack.token);
@@ -24,12 +26,12 @@ export class NotificationManager {
     const direction = result.direction === 1 ? "INC" : "DEC";
     const inputTokenAddress =
       result.direction === 1
-        ? this.config.tokens.collateral.address
-        : this.config.tokens.debt.address;
+        ? await this.contracts.getCollateralTokenAddress()
+        : await this.contracts.getDebtTokenAddress();
     const outputTokenAddress =
       result.direction === 1
-        ? this.config.tokens.debt.address
-        : this.config.tokens.collateral.address;
+        ? await this.contracts.getDebtTokenAddress()
+        : await this.contracts.getCollateralTokenAddress();
 
     const [inputTokenMetadata, outputTokenMetadata] = await Promise.all([
       getTokenMetadata(this.provider, inputTokenAddress),

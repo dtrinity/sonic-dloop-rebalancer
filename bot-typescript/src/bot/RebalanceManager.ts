@@ -23,7 +23,11 @@ export class RebalanceManager {
   ) {
     this.quoteManager = new QuoteManager(contracts, config);
     this.swapDataBuilder = new SwapDataBuilder(contracts, config);
-    this.notificationManager = new NotificationManager(config, contracts.provider);
+    this.notificationManager = new NotificationManager(
+      config,
+      contracts.provider,
+      contracts,
+    );
   }
 
   async executeRebalance(): Promise<void> {
@@ -182,7 +186,7 @@ export class RebalanceManager {
     trialAmount: bigint,
   ): Promise<boolean> {
     try {
-      const debtTokenAddress = this.config.tokens.debt.address;
+      const debtTokenAddress = await this.contracts.getDebtTokenAddress();
       let requiredFlashAmount: bigint;
 
       if (quote.direction === 1) {
@@ -190,7 +194,7 @@ export class RebalanceManager {
         const collateralInBase =
           await this.contracts.core.convertFromTokenAmountToBaseCurrency(
             trialAmount,
-            this.config.tokens.collateral.address,
+            await this.contracts.getCollateralTokenAddress(),
           );
         requiredFlashAmount =
           await this.contracts.core.convertFromBaseCurrencyToToken(
@@ -203,7 +207,9 @@ export class RebalanceManager {
       }
 
       const maxFlashLoan =
-        await this.contracts.flashLender.maxFlashLoan(debtTokenAddress);
+        await (await this.contracts.getFlashLender()).maxFlashLoan(
+          debtTokenAddress,
+        );
       const maxAllowed = maxFlashLoan / FLASH_LOAN_SAFETY_DIVISOR;
 
       const available = requiredFlashAmount <= maxAllowed;
@@ -308,7 +314,7 @@ export class RebalanceManager {
             // Increase leverage
             const collateralMetadata = await getTokenMetadata(
               this.contracts.provider,
-              this.config.tokens.collateral.address,
+              await this.contracts.getCollateralTokenAddress(),
             );
             logger.info("Executing increase leverage", {
               amount: formatTokenAmountWithSymbol(
@@ -327,7 +333,7 @@ export class RebalanceManager {
             // Decrease leverage
             const debtMetadata = await getTokenMetadata(
               this.contracts.provider,
-              this.config.tokens.debt.address,
+              await this.contracts.getDebtTokenAddress(),
             );
             logger.info("Executing decrease leverage", {
               amount: formatTokenAmountWithSymbol(

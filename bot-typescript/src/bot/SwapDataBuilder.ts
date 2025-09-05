@@ -28,7 +28,7 @@ export class SwapDataBuilder {
     if (!this.collateralMetadata) {
       this.collateralMetadata = await getTokenMetadata(
         this.contracts.provider,
-        this.config.tokens.collateral.address,
+        await this.contracts.getCollateralTokenAddress(),
       );
     }
     return this.collateralMetadata;
@@ -38,7 +38,7 @@ export class SwapDataBuilder {
     if (!this.debtMetadata) {
       this.debtMetadata = await getTokenMetadata(
         this.contracts.provider,
-        this.config.tokens.debt.address,
+        await this.contracts.getDebtTokenAddress(),
       );
     }
     return this.debtMetadata;
@@ -49,10 +49,6 @@ export class SwapDataBuilder {
     trialRebalanceAmount: bigint,
     userAddress: string,
   ): Promise<string> {
-    if (!this.config.contracts.odosRouter) {
-      throw new Error("Odos router not configured for this network");
-    }
-
     try {
       if (quote.direction === 1) {
         // Increase leverage: swap debt -> collateral (exact out)
@@ -108,12 +104,12 @@ export class SwapDataBuilder {
     const collateralInBase =
       await this.contracts.core.convertFromTokenAmountToBaseCurrency(
         collateralAmountOut,
-        this.config.tokens.collateral.address,
+        await this.contracts.getCollateralTokenAddress(),
       );
     const estimatedDebtInput =
       await this.contracts.core.convertFromBaseCurrencyToToken(
         collateralInBase,
-        this.config.tokens.debt.address,
+        await this.contracts.getDebtTokenAddress(),
       );
 
     // Set a high input cap to ensure we have enough for exact-output
@@ -137,13 +133,13 @@ export class SwapDataBuilder {
       chainId: this.config.network.chainId,
       inputTokens: [
         {
-          tokenAddress: this.config.tokens.debt.address,
+          tokenAddress: await this.contracts.getDebtTokenAddress(),
           amount: debtInputCap.toString(),
         },
       ],
       outputTokens: [
         {
-          tokenAddress: this.config.tokens.collateral.address,
+          tokenAddress: await this.contracts.getCollateralTokenAddress(),
           amount: collateralAmountOut.toString(), // Exact output amount
         },
       ],
@@ -175,14 +171,8 @@ export class SwapDataBuilder {
       debtAmountToRepay: debtAmountToRepay.toString(),
     });
 
-    // Calculate flash loan fee
-    const flashFee = await this.contracts.flashLender.flashFee(
-      this.config.tokens.debt.address,
-      debtAmountToRepay,
-    );
-
-    // Total debt needed = repay amount + flash fee
-    const totalDebtNeeded = debtAmountToRepay + flashFee;
+    // Total debt needed = repay amount
+    const totalDebtNeeded = debtAmountToRepay;
     const debtMetadata = await this.getDebtMetadata();
     const totalDebtNeededFormatted = formatTokenAmount(
       totalDebtNeeded,
@@ -193,12 +183,12 @@ export class SwapDataBuilder {
     const debtInBase =
       await this.contracts.core.convertFromTokenAmountToBaseCurrency(
         totalDebtNeeded,
-        this.config.tokens.debt.address,
+        await this.contracts.getDebtTokenAddress(),
       );
     const estimatedCollateralInput =
       await this.contracts.core.convertFromBaseCurrencyToToken(
         debtInBase,
-        this.config.tokens.collateral.address,
+        await this.contracts.getCollateralTokenAddress(),
       );
 
     // Set a high input cap to ensure we have enough for exact-output
@@ -217,20 +207,19 @@ export class SwapDataBuilder {
       inputCapPercent: `${inputCapBps / 100}%`,
       outputToken: debtMetadata.symbol,
       exactOutputAmount: totalDebtNeededFormatted,
-      flashFee: formatTokenAmount(flashFee, debtMetadata.decimals),
     });
 
     const quoteRequest = {
       chainId: this.config.network.chainId,
       inputTokens: [
         {
-          tokenAddress: this.config.tokens.collateral.address,
+          tokenAddress: await this.contracts.getCollateralTokenAddress(),
           amount: collateralInputCap.toString(),
         },
       ],
       outputTokens: [
         {
-          tokenAddress: this.config.tokens.debt.address,
+          tokenAddress: await this.contracts.getDebtTokenAddress(),
           amount: totalDebtNeeded.toString(), // Exact output amount
         },
       ],
