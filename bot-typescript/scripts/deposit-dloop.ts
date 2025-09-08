@@ -4,10 +4,11 @@ import { ContractManager } from "../src/bot/ContractManager";
 import { OdosClient } from "../src/bot/OdosClient";
 import { getTokenDecimals, getTokenSymbol, formatTokenAmountWithSymbol } from "../src/common/erc20";
 import { logger } from "../src/common/log";
+import { ONE_HUNDRED_PERCENT_BPS, ONE_PERCENT_BPS } from "../src/config/constants";
 
 interface DepositParams {
   depositAmount: string; // Amount to deposit in human readable format (e.g., "100" for 100 tokens)
-  slippageBps: number; // Slippage tolerance in basis points (e.g., 50 for 0.5%)
+  slippageBps: bigint; // Slippage tolerance in basis points (e.g., 50 for 0.5%)
   receiver?: string; // Address to receive the shares, defaults to signer
 }
 
@@ -16,7 +17,9 @@ const IDLoopDepositorOdosABI = [
   "function calculateMinOutputShares(uint256 depositAmount, uint256 slippageBps, address dLoopCore) view returns (uint256)",
   "function odosRouter() view returns (address)",
   "function flashLender() view returns (address)",
-  "function setBreakPoint(uint256 _breakPoint)"
+  "function estimateFlashLoanSwapOutputCollateralAmount(uint256 assets, uint256 minOutputShares, address dLoopCore) view returns (uint256)",
+  "function setBreakPoint(uint256 _breakPoint)",
+  "function breakPoint() view returns (uint256)"
 ];
 
 export interface DLoopDepositorContract {
@@ -35,7 +38,13 @@ export interface DLoopDepositorContract {
   ): Promise<bigint>;
   odosRouter(): Promise<string>;
   flashLender(): Promise<string>;
+  estimateFlashLoanSwapOutputCollateralAmount(
+    assets: bigint,
+    minOutputShares: bigint,
+    dLoopCore: string,
+  ): Promise<bigint>;
   setBreakPoint(breakPoint: bigint): Promise<ethers.ContractTransactionResponse>;
+  breakPoint(): Promise<bigint>;
 }
 
 /**
@@ -60,7 +69,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     });
 
     const depositor = new ethers.Contract(
-      "0x2494a76723Bf01725800DD51302356f0D14a61e1",
+      "0xaE63d82b103a69CfC8c8Cc215FF02C1f5B604442",
       IDLoopDepositorOdosABI,
       contractManager.signer,
     ) as unknown as DLoopDepositorContract
@@ -93,7 +102,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     // Calculate min output shares
     const minOutputShares = await depositor.calculateMinOutputShares(
       depositAmountBigInt,
-      BigInt(slippageBps),
+      BigInt(2 * ONE_PERCENT_BPS),
       SONIC_MAINNET_CONFIG.contracts.dloopCore
     );
 
@@ -112,23 +121,38 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     // Create Odos client for swap data
     const odosClient = new OdosClient(SONIC_MAINNET_CONFIG.network.odosApiUrl, SONIC_MAINNET_CONFIG.network.chainId);
 
-    // Get quote for debt token to collateral token swap
-    // We need to estimate how much debt token we'll need to borrow and swap back to collateral
-    // For the quote, we'll use a reasonable estimate based on the leverage
-    const estimatedDebtAmount = depositAmountBigInt * BigInt(2); // Rough estimate for 3x leverage
+    const estimatedFlashLoanSwapOutputCollateralAmount = await depositor.estimateFlashLoanSwapOutputCollateralAmount(
+      depositAmountBigInt,
+      minOutputShares,
+      SONIC_MAINNET_CONFIG.contracts.dloopCore
+    );
+
+    const estimatedFlashLoanSwapOutputCollateralAmountNormalized = ethers.formatUnits(estimatedFlashLoanSwapOutputCollateralAmount, collateralMetadata.decimals);
+
+    // The additional collateral amount is estimated based on the leverage
+    // 3x means we need to deposit 2x more collateral, the principal amount is already 1x
+    const estimatedInputDebtAmountNormalized = await odosClient.calculateInputAmount(
+      estimatedFlashLoanSwapOutputCollateralAmountNormalized.toString(),
+      debtTokenAddress,
+      collateralTokenAddress,
+      SONIC_MAINNET_CONFIG.network.chainId,
+      Number(slippageBps) / ONE_PERCENT_BPS,
+    ); // Rough estimate for 3x leverage
 
     const quoteRequest = {
       chainId: SONIC_MAINNET_CONFIG.network.chainId,
       inputTokens: [{
         tokenAddress: debtTokenAddress,
-        amount: OdosClient.formatTokenAmount(ethers.formatUnits(estimatedDebtAmount, debtMetadata.decimals), debtMetadata.decimals),
+        amount: OdosClient.formatTokenAmount(estimatedInputDebtAmountNormalized, debtMetadata.decimals),
       }],
       outputTokens: [{
         tokenAddress: collateralTokenAddress,
         proportion: 1,
       }],
       userAddr: signerAddress,
-      slippageLimitPercent: 20, // Convert bps to percent
+      slippageLimitPercent: (Number(slippageBps) / ONE_PERCENT_BPS), // Convert bps to percent
+      disableRFQs: true,
+      compact: true
     };
 
     logger.info("Requesting Odos quote for swap data", quoteRequest);
@@ -140,23 +164,28 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       outAmounts: quoteResponse.outAmounts,
     });
 
+    // if (quoteResponse.outAmounts[0] !== estimatedFlashLoanSwapOutputCollateralAmount.toString()) {
+    //   throw new Error(`Estimated flash loan swap output collateral amount does not match the quote response output amount: ${estimatedFlashLoanSwapOutputCollateralAmount.toString()} !== ${quoteResponse.outAmounts[0]}`);
+    // }
+
     // Assemble transaction to get swap data
     const assembleRequest = {
       chainId: SONIC_MAINNET_CONFIG.network.chainId,
-      pathId: quoteResponse.pathId,
-      userAddr: signerAddress,
-      simulate: false,
-      receiver: receiverAddress,
+      liquidatorAccountAddress: signerAddress,
+      collateralTokenAddress: collateralTokenAddress,
     };
 
-    const assembleResponse = await odosClient.assembleTransaction(assembleRequest);
-    logger.info("Odos transaction assembled", {
-      to: assembleResponse.transaction.to,
-      data: assembleResponse.transaction.data.substring(0, 66) + "...", // Truncate for logging
-    });
+    const assembledQuote = await odosClient.getAssembledQuote(
+      await depositor.odosRouter(),
+      contractManager.signer,
+      odosClient,
+      quoteResponse,
+      assembleRequest,
+      await depositor.getAddress()
+    );
 
     // Extract swap data from the assembled transaction
-    const swapData = assembleResponse.transaction.data;
+    const swapData = assembledQuote.transaction.data;
 
     logger.info("Preparing deposit transaction", {
       assets: depositAmountBigInt.toString(),
@@ -183,18 +212,24 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     }
 
     // Set breakpoint here
-    const setBreakPointTx = await depositor.setBreakPoint(depositAmountBigInt);
-    logger.info("Set breakpoint transaction submitted", {
-      txHash: setBreakPointTx.hash,
-    });
-    await setBreakPointTx.wait();
+    // const breakPoint = 0n;
+
+    // if (await depositor.breakPoint() !== breakPoint) {
+    //   const setBreakPointTx = await depositor.setBreakPoint(breakPoint);
+    //   logger.info("Set breakpoint transaction submitted", {
+    //     txHash: setBreakPointTx.hash,
+    //   });
+    //   await setBreakPointTx.wait();
+    // } else {
+    //   logger.info(`Breakpoint is already set to ${breakPoint}`);
+    // }
 
     // Execute deposit
     logger.info("Executing deposit transaction...");
     const depositTx = await depositor.deposit(
       depositAmountBigInt,
       receiverAddress,
-      minOutputShares / 2n,
+      minOutputShares,
       swapData,
       SONIC_MAINNET_CONFIG.contracts.dloopCore
     );
@@ -288,8 +323,8 @@ async function getTokenMetadata(
 async function main(): Promise<void> {
   // Default parameters - can be modified as needed
   const depositParams: DepositParams = {
-    depositAmount: "0.5",
-    slippageBps: 50,
+    depositAmount: "0.1",
+    slippageBps: BigInt(0.5 * ONE_PERCENT_BPS), // 0.5% slippage
     // receiver: "0x..." // optional, defaults to signer
   };
 
