@@ -11,7 +11,9 @@ const IDLoopCoreABI = [
   "function convertFromTokenAmountToBaseCurrency(uint256 amount, address token) view returns (uint256)",
   "function convertFromBaseCurrencyToToken(uint256 amount, address token) view returns (uint256)",
   "function balanceOf(address account) view returns (uint256)",
-  "function getTotalCollateralAndDebtOfUserInBase(address user) view returns (uint256, uint256)"
+  "function getTotalCollateralAndDebtOfUserInBase(address user) view returns (uint256, uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)"
 ];
 
 const IDLoopQuoterABI = [
@@ -29,6 +31,7 @@ const IDecreaseLeverageOdosABI = [
   "function odosRouter() view returns (address)",
   "function flashLender() view returns (address)"
 ];
+
 
 const IFlashLenderABI = [
   "function maxFlashLoan(address token) view returns (uint256)",
@@ -56,6 +59,8 @@ export interface DLoopCoreContract {
   ): Promise<bigint>;
   balanceOf(account: string): Promise<bigint>;
   getTotalCollateralAndDebtOfUserInBase(user: string): Promise<[bigint, bigint]>;
+  approve(spender: string, amount: bigint): Promise<ethers.ContractTransactionResponse>;
+  allowance(owner: string, spender: string): Promise<bigint>;
 }
 
 export interface DLoopQuoterContract {
@@ -136,7 +141,7 @@ export class ContractManager {
       IDecreaseLeverageOdosABI,
       _signer,
     ) as unknown as DecreaseLeverageContract;
- 
+
     this.signer = _signer;
   }
 
