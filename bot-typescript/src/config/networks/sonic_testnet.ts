@@ -1,9 +1,13 @@
+import dotenv from "dotenv";
+
 import {
   ContractsConfig,
   NetworkConfig,
   NotificationsConfig,
   PolicyConfig,
 } from "../types";
+
+dotenv.config();
 
 // Sonic Testnet Configuration
 export const SONIC_TESTNET_CONFIG: {
@@ -16,7 +20,7 @@ export const SONIC_TESTNET_CONFIG: {
     rpcUrl: "https://rpc.sonic.fantom.network",
     odosApiUrl: "https://api.odos.xyz",
     chainId: 1946,
-    privateKey: "",
+    privateKey: process.env.PRIVATE_KEY || "<not_private_key>",
   },
   contracts: {
     dloopCore: "0x0000000000000000000000000000000000000000",

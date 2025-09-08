@@ -13,6 +13,7 @@ import {
   QuoteRequest,
   QuoteResponse,
 } from "./types";
+import { approveAllowanceIfNeeded } from "../common/erc20";
 
 export class OdosClient {
   private readonly axiosInstance: AxiosInstance;
@@ -151,6 +152,58 @@ export class OdosClient {
   }
 
   /**
+   * Get assembled quote from Odos with required approvals
+   *
+   * @param odosRouter - The Odos router
+   * @param signer - The signer
+   * @param odosClient - The Odos client
+   * @param quote - The quote
+   * @param params - The parameters
+   * @param params.chainId - The chain ID
+   * @param params.liquidatorAccountAddress - The address of the liquidator
+   * @param params.collateralTokenAddress - The address of the collateral token
+   * @param receiverAddress - The address of the receiver
+   * @returns The assembled quote
+   */
+  async getAssembledQuote(
+    odosRouter: string,
+    signer: ethers.Signer,
+    odosClient: OdosClient,
+    quote: QuoteResponse,
+    params: {
+      chainId: number;
+      liquidatorAccountAddress: string;
+      collateralTokenAddress: string;
+    },
+    receiverAddress: string,
+  ): Promise<any> {
+    await approveAllowanceIfNeeded(
+      params.collateralTokenAddress,
+      odosRouter,
+      BigInt(quote.inAmounts[0]),
+      signer,
+    );
+
+    const assembleRequest = {
+      chainId: params.chainId,
+      pathId: quote.pathId,
+      userAddr: params.liquidatorAccountAddress,
+      simulate: false,
+      receiver: receiverAddress,
+    };
+    const assembled = await odosClient.assembleTransaction(assembleRequest);
+
+    await approveAllowanceIfNeeded(
+      params.collateralTokenAddress,
+      receiverAddress,
+      BigInt(quote.inAmounts[0]),
+      signer,
+    );
+
+    return assembled;
+  }
+
+  /**
    * Helper method to format token amounts according to decimals
    *
    * @param amount Amount in human readable format
@@ -178,5 +231,87 @@ export class OdosClient {
    */
   static parseTokenAmount(amount: string, decimals: number): string {
     return ethers.formatUnits(amount, decimals);
+  }
+
+  /**
+   * Calculate input amount based on desired output amount using token prices
+   *
+   * @param outputAmount Desired output amount in human readable format
+   * @param inputTokenAddress Input token address
+   * @param outputTokenAddress Output token address
+   * @param chainId Chain ID for the tokens
+   * @param slippagePercentage Percentage to increase input amount by (e.g., 0.1 for 0.1% increase)
+   * @returns Calculated input amount in human readable format
+   */
+  async calculateInputAmount(
+    outputAmount: string,
+    inputTokenAddress: string,
+    outputTokenAddress: string,
+    chainId: number,
+    slippagePercentage: number,
+  ): Promise<string> {
+    // Validate chainId if client was initialized with one
+    if (this.chainId && chainId !== this.chainId) {
+      throw new Error(
+        `Chain ID mismatch. Expected ${this.chainId}, got ${chainId}`,
+      );
+    }
+
+    try {
+      // Get prices for both tokens
+      const [inputPrice, outputPrice] = await Promise.all([
+        this.getTokenPrice(chainId, inputTokenAddress),
+        this.getTokenPrice(chainId, outputTokenAddress),
+      ]);
+
+      // Calculate input amount based on price ratio
+      const outputAmountInUsd = Number(outputAmount) * outputPrice;
+      const inputAmountInUsd = outputAmountInUsd / inputPrice;
+
+      // Apply slippage percentage (e.g., 0.1% = 0.001)
+      const slippageMultiplier = 1 + slippagePercentage / 100;
+      const inputAmount = (inputAmountInUsd * slippageMultiplier).toString();
+      return inputAmount;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(
+          `Price calculation failed: ${error.response.data.message || error.message}`,
+        );
+      }
+      throw error;
+    }
+  }
+
+  /**
+   * Get token price from ODOS API
+   *
+   * @param chainId Chain ID for the token
+   * @param tokenAddress Token address
+   * @returns Token price in USD
+   */
+  private async getTokenPrice(
+    chainId: number,
+    tokenAddress: string,
+  ): Promise<number> {
+    try {
+      const response = await axios.get<{
+        deprecated: string;
+        currencyId: string;
+        price: number;
+      }>(`${this.baseUrl}/pricing/token/${chainId}/${tokenAddress}`);
+
+      if (typeof response.data.price !== "number") {
+        throw new Error("Invalid price data received from API");
+      }
+
+      return response.data.price;
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response) {
+        throw new Error(
+          `Failed to get token price: ${error.response.data.message || error.message}`,
+        );
+      }
+      throw error;
+    }
   }
 }

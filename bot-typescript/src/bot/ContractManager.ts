@@ -9,7 +9,9 @@ const IDLoopCoreABI = [
   "function collateralToken() view returns (address)",
   "function debtToken() view returns (address)",
   "function convertFromTokenAmountToBaseCurrency(uint256 amount, address token) view returns (uint256)",
-  "function convertFromBaseCurrencyToToken(uint256 amount, address token) view returns (uint256)"
+  "function convertFromBaseCurrencyToToken(uint256 amount, address token) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)",
+  "function getTotalCollateralAndDebtOfUserInBase(address user) view returns (uint256, uint256)"
 ];
 
 const IDLoopQuoterABI = [
@@ -33,6 +35,11 @@ const IFlashLenderABI = [
   "function flashFee(address token, uint256 amount) view returns (uint256)"
 ];
 
+const ERC20_ABI = [
+  "function approve(address spender, uint256 amount) returns (bool)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+];
+
 // Typed contract interfaces for better type safety
 export interface DLoopCoreContract {
   getCurrentSubsidyBps(): Promise<bigint>;
@@ -47,6 +54,8 @@ export interface DLoopCoreContract {
     amount: bigint,
     token: string,
   ): Promise<bigint>;
+  balanceOf(account: string): Promise<bigint>;
+  getTotalCollateralAndDebtOfUserInBase(user: string): Promise<[bigint, bigint]>;
 }
 
 export interface DLoopQuoterContract {
@@ -80,19 +89,26 @@ export interface FlashLenderContract {
   flashFee(token: string, amount: bigint): Promise<bigint>;
 }
 
+export interface ERC20Contract {
+  approve(spender: string, amount: bigint): Promise<ethers.ContractTransactionResponse>;
+  allowance(owner: string, spender: string): Promise<bigint>;
+}
+
 export class ContractManager {
   public readonly provider: ethers.Provider;
   public readonly core: DLoopCoreContract;
   public readonly quoter: DLoopQuoterContract;
   public readonly increaseOdos: IncreaseLeverageContract;
   public readonly decreaseOdos: DecreaseLeverageContract;
+  public readonly signer: ethers.Signer;
+  public collateralToken: ERC20Contract | undefined;
   private cachedCollateralToken?: string;
   private cachedDebtToken?: string;
   private cachedFlashLender?: FlashLenderContract;
 
   constructor(
     provider: ethers.Provider,
-    private readonly signer: ethers.Signer,
+    private readonly _signer: ethers.Signer,
     private readonly config: BotConfig,
   ) {
     this.provider = provider;
@@ -112,14 +128,16 @@ export class ContractManager {
     this.increaseOdos = new ethers.Contract(
       config.contracts.increaseOdos,
       IIncreaseLeverageOdosABI,
-      signer,
+      _signer,
     ) as unknown as IncreaseLeverageContract;
 
     this.decreaseOdos = new ethers.Contract(
       config.contracts.decreaseOdos,
       IDecreaseLeverageOdosABI,
-      signer,
+      _signer,
     ) as unknown as DecreaseLeverageContract;
+ 
+    this.signer = _signer;
   }
 
   static async create(config: BotConfig): Promise<ContractManager> {
@@ -174,5 +192,16 @@ export class ContractManager {
     ) as unknown as FlashLenderContract;
 
     return this.cachedFlashLender;
+  }
+
+  async getCollateralToken(): Promise<ERC20Contract> {
+    if (!this.collateralToken) {
+      this.collateralToken = new ethers.Contract(
+        await this.core.collateralToken(),
+        ERC20_ABI,
+        this.signer,
+      ) as unknown as ERC20Contract;
+    }
+    return this.collateralToken;
   }
 }

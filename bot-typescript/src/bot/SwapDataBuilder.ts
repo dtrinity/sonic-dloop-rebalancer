@@ -140,7 +140,7 @@ export class SwapDataBuilder {
       outputTokens: [
         {
           tokenAddress: await this.contracts.getCollateralTokenAddress(),
-          amount: collateralAmountOut.toString(), // Exact output amount
+          proportion: 1,
         },
       ],
       userAddr: userAddress,
@@ -220,7 +220,7 @@ export class SwapDataBuilder {
       outputTokens: [
         {
           tokenAddress: await this.contracts.getDebtTokenAddress(),
-          amount: totalDebtNeeded.toString(), // Exact output amount
+          proportion: 1,
         },
       ],
       userAddr: userAddress,

@@ -5,7 +5,7 @@ export interface TokenInput {
 
 export interface TokenOutput {
   tokenAddress: string;
-  amount: string;
+  proportion: number;
 }
 
 export interface QuoteRequest {

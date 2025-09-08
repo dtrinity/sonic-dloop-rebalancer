@@ -10,6 +10,7 @@ export interface ContractsConfig {
   dloopQuoter: string;
   increaseOdos: string;
   decreaseOdos: string;
+  depositor?: string;
 }
 
 export interface TokenConfig {
