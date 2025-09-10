@@ -18,8 +18,8 @@ const IDLoopDepositorOdosABI = [
   "function odosRouter() view returns (address)",
   "function flashLender() view returns (address)",
   "function estimateFlashLoanSwapOutputCollateralAmount(uint256 assets, uint256 minOutputShares, address dLoopCore) view returns (uint256)",
-  "function setBreakPoint(uint256 _breakPoint)",
-  "function breakPoint() view returns (uint256)"
+  // "function setBreakPoint(uint256 _breakPoint)",
+  // "function breakPoint() view returns (uint256)"
 ];
 
 export interface DLoopDepositorContract {
@@ -43,8 +43,8 @@ export interface DLoopDepositorContract {
     minOutputShares: bigint,
     dLoopCore: string,
   ): Promise<bigint>;
-  setBreakPoint(breakPoint: bigint): Promise<ethers.ContractTransactionResponse>;
-  breakPoint(): Promise<bigint>;
+  // setBreakPoint(breakPoint: bigint): Promise<ethers.ContractTransactionResponse>;
+  // breakPoint(): Promise<bigint>;
 }
 
 /**
@@ -69,7 +69,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     });
 
     const depositor = new ethers.Contract(
-      "0xaE63d82b103a69CfC8c8Cc215FF02C1f5B604442",
+      "0xf5DF484dD4ecb304103aD9457b78d680134d0704",
       IDLoopDepositorOdosABI,
       contractManager.signer,
     ) as unknown as DLoopDepositorContract
@@ -102,7 +102,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     // Calculate min output shares
     const minOutputShares = await depositor.calculateMinOutputShares(
       depositAmountBigInt,
-      BigInt(2 * ONE_PERCENT_BPS),
+      BigInt(2.5 * ONE_PERCENT_BPS),
       SONIC_MAINNET_CONFIG.contracts.dloopCore
     );
 
@@ -136,7 +136,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       debtTokenAddress,
       collateralTokenAddress,
       SONIC_MAINNET_CONFIG.network.chainId,
-      Number(slippageBps) / ONE_PERCENT_BPS,
+      0.0001,
     ); // Rough estimate for 3x leverage
 
     const quoteRequest = {
