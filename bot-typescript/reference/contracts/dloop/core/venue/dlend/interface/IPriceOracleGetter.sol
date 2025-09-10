@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0
 /* ———————————————————————————————————————————————————————————————————————————————— *
  *    _____     ______   ______     __     __   __     __     ______   __  __       *
  *   /\  __-.  /\__  _\ /\  == \   /\ \   /\ "-.\ \   /\ \   /\__  _\ /\ \_\ \      *
@@ -15,49 +15,32 @@
  * dTRINITY Protocol: https://github.com/dtrinity                                   *
  * ———————————————————————————————————————————————————————————————————————————————— */
 
-pragma solidity ^0.8.20;
-
-import { DLoopDecreaseLeverageBase, ERC20, IERC3156FlashLender } from "../../DLoopDecreaseLeverageBase.sol";
-import { OdosSwapLogic, IOdosRouterV2 } from "./OdosSwapLogic.sol";
+pragma solidity ^0.8.0;
 
 /**
- * @title DLoopDecreaseLeverageOdos
- * @dev Implementation of DLoopDecreaseLeverageBase with Odos swap functionality
+ * @title IPriceOracleGetter
+ * @author Aave
+ * @notice Interface for the Aave price oracle.
  */
-contract DLoopDecreaseLeverageOdos is DLoopDecreaseLeverageBase {
-    IOdosRouterV2 public immutable odosRouter;
+interface IPriceOracleGetter {
+    /**
+     * @notice Returns the base currency address
+     * @dev Address 0x0 is reserved for USD as base currency.
+     * @return Returns the base currency address.
+     */
+    function BASE_CURRENCY() external view returns (address);
 
     /**
-     * @dev Constructor for the DLoopDecreaseLeverageOdos contract
-     * @param _flashLender Address of the flash loan provider
-     * @param _odosRouter Address of the Odos router
+     * @notice Returns the base currency unit
+     * @dev 1 ether for ETH, 1e8 for USD.
+     * @return Returns the base currency unit.
      */
-    constructor(IERC3156FlashLender _flashLender, IOdosRouterV2 _odosRouter) DLoopDecreaseLeverageBase(_flashLender) {
-        odosRouter = _odosRouter;
-    }
+    function BASE_CURRENCY_UNIT() external view returns (uint256);
 
     /**
-     * @dev Swaps an exact amount of output tokens for the minimum input tokens using Odos
+     * @notice Returns the asset price in the base currency
+     * @param asset The address of the asset
+     * @return The price of the asset
      */
-    function _swapExactOutputImplementation(
-        ERC20 inputToken,
-        ERC20 outputToken,
-        uint256 amountOut,
-        uint256 amountInMaximum,
-        address receiver,
-        uint256 deadline,
-        bytes memory collateralToDebtTokenSwapData
-    ) internal override returns (uint256) {
-        return
-            OdosSwapLogic.swapExactOutput(
-                inputToken,
-                outputToken,
-                amountOut,
-                amountInMaximum,
-                receiver,
-                deadline,
-                collateralToDebtTokenSwapData,
-                odosRouter
-            );
-    }
+    function getAssetPrice(address asset) external view returns (uint256);
 }

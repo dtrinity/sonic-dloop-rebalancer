@@ -17,23 +17,32 @@
 
 pragma solidity ^0.8.20;
 
-import { DLoopIncreaseLeverageBase, ERC20, IERC3156FlashLender } from "../../DLoopIncreaseLeverageBase.sol";
+import { DLoopDecreaseLeverageBase, ERC20, IERC3156FlashLender } from "../../DLoopDecreaseLeverageBase.sol";
 import { OdosSwapLogic, IOdosRouterV2 } from "./OdosSwapLogic.sol";
 
 /**
- * @title DLoopIncreaseLeverageOdos
- * @dev Implementation of DLoopIncreaseLeverageBase with Odos swap functionality
+ * @title DLoopDecreaseLeverageOdos
+ * @dev Implementation of DLoopDecreaseLeverageBase with Odos swap functionality
  */
-contract DLoopIncreaseLeverageOdos is DLoopIncreaseLeverageBase {
+contract DLoopDecreaseLeverageOdos is DLoopDecreaseLeverageBase {
     IOdosRouterV2 public immutable odosRouter;
 
     /**
-     * @dev Constructor for the DLoopIncreaseLeverageOdos contract
+     * @dev Constructor for the DLoopDecreaseLeverageOdos contract
      * @param _flashLender Address of the flash loan provider
      * @param _odosRouter Address of the Odos router
      */
-    constructor(IERC3156FlashLender _flashLender, IOdosRouterV2 _odosRouter) DLoopIncreaseLeverageBase(_flashLender) {
+    constructor(IERC3156FlashLender _flashLender, IOdosRouterV2 _odosRouter) DLoopDecreaseLeverageBase(_flashLender) {
         odosRouter = _odosRouter;
+    }
+
+    /**
+     * @dev The difference tolerance for the swapped output amount
+     * @param expectedOutputAmount Expected output amount
+     * @return differenceTolerance The difference tolerance amount
+     */
+    function swappedOutputDifferenceToleranceAmount(uint256 expectedOutputAmount) public pure override returns (uint256) {
+        return OdosSwapLogic.swappedOutputDifferenceToleranceAmount(expectedOutputAmount);
     }
 
     /**
@@ -46,7 +55,7 @@ contract DLoopIncreaseLeverageOdos is DLoopIncreaseLeverageBase {
         uint256 amountInMaximum,
         address receiver,
         uint256 deadline,
-        bytes memory debtTokenToCollateralSwapData
+        bytes memory collateralToDebtTokenSwapData
     ) internal override returns (uint256) {
         return
             OdosSwapLogic.swapExactOutput(
@@ -56,7 +65,7 @@ contract DLoopIncreaseLeverageOdos is DLoopIncreaseLeverageBase {
                 amountInMaximum,
                 receiver,
                 deadline,
-                debtTokenToCollateralSwapData,
+                collateralToDebtTokenSwapData,
                 odosRouter
             );
     }
