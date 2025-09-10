@@ -13,7 +13,8 @@ import {
   QuoteRequest,
   QuoteResponse,
 } from "./types";
-import { approveAllowanceIfNeeded } from "../common/erc20";
+import { approveAllowanceIfNeeded, getTokenDecimals } from "../common/erc20";
+import { getConfig } from "../config/config";
 
 export class OdosClient {
   private readonly axiosInstance: AxiosInstance;
@@ -258,19 +259,16 @@ export class OdosClient {
     }
 
     try {
-      // Get prices for both tokens
-      const [inputPrice, outputPrice] = await Promise.all([
+      const [inputTokenPriceInBase, outputTokenPriceInBase] = await Promise.all([
         this.getTokenPrice(chainId, inputTokenAddress),
         this.getTokenPrice(chainId, outputTokenAddress),
       ]);
-
-      // Calculate input amount based on price ratio
-      const outputAmountInUsd = Number(outputAmount) * outputPrice;
-      const inputAmountInUsd = outputAmountInUsd / inputPrice;
+      const estimatedInputAmount = (Number(outputAmount) * outputTokenPriceInBase) / inputTokenPriceInBase;
+      const exchangeRate = await this.quoteExchangeRate(chainId, inputTokenAddress, outputTokenAddress, 'output', estimatedInputAmount.toString());
 
       // Apply slippage percentage (e.g., 0.1% = 0.001)
       const slippageMultiplier = 1 + slippagePercentage / 100;
-      const inputAmount = (inputAmountInUsd * slippageMultiplier).toString();
+      const inputAmount = (Number(outputAmount) / exchangeRate * slippageMultiplier).toString();
       return inputAmount;
     } catch (error) {
       if (axios.isAxiosError(error) && error.response) {
@@ -312,6 +310,60 @@ export class OdosClient {
         );
       }
       throw error;
+    }
+  }
+
+  /**
+   * Get exchange rate from ODOS API
+   *
+   * @param chainId Chain ID for the token
+   * @param inputTokenAddress Token address
+   * @param outputTokenAddress Token address
+   * @param quoteToken Quote token
+   * @param estimatedInputAmount Estimated input amount
+   * @param slippagePercentage Percentage to increase input amount by (e.g., 0.1 for 0.1% increase)
+   * @returns Exchange rate
+   */
+  public async quoteExchangeRate(
+    chainId: number,
+    inputTokenAddress: string,
+    outputTokenAddress: string,
+    quoteToken: 'input' | 'output',
+    estimatedInputAmount: string = "500",
+    slippagePercentage: number = 0.1,
+  ): Promise<number> {
+    const ERC20_ABI = [
+      "function decimals() view returns (uint8)",
+    ];
+    const provider = new ethers.JsonRpcProvider((await getConfig()).network.rpcUrl);
+    const inputTokenContract = new ethers.Contract(inputTokenAddress, ERC20_ABI, provider);
+    const inputTokenDecimals = Number(await inputTokenContract.decimals());
+    const quoteRequest = {
+      chainId: chainId,
+      inputTokens: [{
+        tokenAddress: inputTokenAddress,
+        amount: OdosClient.formatTokenAmount(estimatedInputAmount, inputTokenDecimals),
+      }],
+      outputTokens: [{
+        tokenAddress: outputTokenAddress,
+        proportion: 1,
+      }],
+      userAddr: "0x0000000000000000000000000000000000000000",
+      slippageLimitPercent: slippagePercentage,
+      disableRFQs: true,
+      compact: true
+    };
+    const quoteResponse = await this.getQuote(quoteRequest);
+
+    const inputAmount = quoteResponse.inAmounts[0];
+    const outputAmount = quoteResponse.outAmounts[0];
+
+    if (quoteToken === 'input') {
+      return Number(inputAmount) / Number(outputAmount);
+    } else if (quoteToken === 'output') {
+      return Number(outputAmount) / Number(inputAmount);
+    } else {
+      throw new Error('Invalid quote token');
     }
   }
 }
