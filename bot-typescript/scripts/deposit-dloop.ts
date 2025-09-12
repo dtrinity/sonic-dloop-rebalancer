@@ -69,7 +69,8 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     });
 
     const depositor = new ethers.Contract(
-      "0xf5DF484dD4ecb304103aD9457b78d680134d0704",
+      "0x44Ed973947100daF6137D61474c01222c932d66e",
+      // "0xf5DF484dD4ecb304103aD9457b78d680134d0704", // buggy
       IDLoopDepositorOdosABI,
       contractManager.signer,
     ) as unknown as DLoopDepositorContract
@@ -136,7 +137,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       debtTokenAddress,
       collateralTokenAddress,
       SONIC_MAINNET_CONFIG.network.chainId,
-      0.0001,
+      0.5,
     ); // Rough estimate for 3x leverage
 
     const quoteRequest = {
@@ -239,7 +240,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     });
 
     // Wait for transaction confirmation
-    const receipt = await depositTx.wait();
+    const receipt = await depositTx.wait(3);
     logger.info("Deposit transaction confirmed", {
       txHash: receipt!.hash,
       gasUsed: receipt!.gasUsed.toString(),

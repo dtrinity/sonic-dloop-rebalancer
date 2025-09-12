@@ -73,7 +73,8 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     });
 
     const redeemer = new ethers.Contract(
-      "0xa521e28df9e83fceA5aD806E2d04fD53BFb5B709",
+      "0x793037226cA2a9e6C606Be5d78d84f565f82EE45",
+      // "0xa521e28df9e83fceA5aD806E2d04fD53BFb5B709", // buggy
       IDLoopRedeemerOdosABI,
       contractManager.signer,
     ) as unknown as DLoopRedeemerContract;
@@ -131,7 +132,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
       collateralTokenAddress,
       debtTokenAddress,
       SONIC_MAINNET_CONFIG.network.chainId,
-      0.0001,
+      0.0005,
     );
     console.log("estimatedInputCollateralAmountNormalized", estimatedInputCollateralAmountNormalized);
 
@@ -252,7 +253,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     });
 
     // Wait for transaction confirmation
-    const receipt = await redeemTx.wait();
+    const receipt = await redeemTx.wait(3);
     logger.info("Redeem transaction confirmed", {
       txHash: receipt!.hash,
       gasUsed: receipt!.gasUsed.toString(),
@@ -336,7 +337,7 @@ async function getTokenMetadata(
 async function main(): Promise<void> {
   // Default parameters - can be modified as needed
   const redeemParams: RedeemParams = {
-    redeemSharesAmount: "0.3",
+    redeemSharesAmount: "0.291060356107956331",
     slippageBps: BigInt(0.5 * ONE_PERCENT_BPS), // 0.5% slippage
     // receiver: "0x..." // optional, defaults to signer
   };
