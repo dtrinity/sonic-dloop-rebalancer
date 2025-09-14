@@ -25,8 +25,8 @@ export const SONIC_MAINNET_CONFIG: {
   contracts: {
     dloopCore: "0x269dB736a71d2e95Eea88487A5a0b51E8E78BDdf",
     dloopQuoter: "0x3409736eEC8EBA0A4bec98cC01d521068090d03B",
-    increaseOdos: "0xe037a89e974910a340BFE6948F30482eBe48153F",
-    decreaseOdos: "0x43F925337078e84CFf83500724Db52449270977b",
+    increaseOdos: "0x3520Fdd1AEe595a1bF9499a756118f919Fa69809",
+    decreaseOdos: "0xcA1c5421a7c3f2B4a8163dd3aBb051fA6A452F1b",
   },
   policy: {
     rebalancePercentageList: [1.0, 0.9, 0.8, 0.7, 0.6, 0.5, 0.4, 0.3, 0.2, 0.1],

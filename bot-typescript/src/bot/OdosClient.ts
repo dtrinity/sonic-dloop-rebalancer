@@ -366,4 +366,47 @@ export class OdosClient {
       throw new Error('Invalid quote token');
     }
   }
+
+  /**
+   * Quote output amount from ODOS API
+   *
+   * @param chainId Chain ID for the token
+   * @param inputTokenAddress Token address
+   * @param outputTokenAddress Token address
+   * @param inputAmount Input amount in human readable format
+   * @returns Output amount
+   */
+  public async quoteOutputAmount(
+    chainId: number,
+    inputTokenAddress: string,
+    outputTokenAddress: string,
+    inputAmount: string,
+  ): Promise<string> {
+    const ERC20_ABI = [
+      "function decimals() view returns (uint8)",
+    ];
+    const provider = new ethers.JsonRpcProvider((await getConfig()).network.rpcUrl);
+    const inputTokenContract = new ethers.Contract(inputTokenAddress, ERC20_ABI, provider);
+    const inputTokenDecimals = Number(await inputTokenContract.decimals());
+    const quoteRequest = {
+      chainId: chainId,
+      inputTokens: [{
+        tokenAddress: inputTokenAddress,
+        amount: OdosClient.formatTokenAmount(inputAmount, inputTokenDecimals),
+      }],
+      outputTokens: [{
+        tokenAddress: outputTokenAddress,
+        proportion: 1,
+      }],
+      userAddr: "0x0000000000000000000000000000000000000000",
+      slippageLimitPercent: 0.1,
+      disableRFQs: true,
+      compact: true
+    };
+    const quoteResponse = await this.getQuote(quoteRequest);
+    const outputTokenContract = new ethers.Contract(outputTokenAddress, ERC20_ABI, provider);
+    const outputTokenDecimals = Number(await outputTokenContract.decimals());
+    const outputAmount = ethers.formatUnits(quoteResponse.outAmounts[0], outputTokenDecimals);
+    return outputAmount;
+  }
 }

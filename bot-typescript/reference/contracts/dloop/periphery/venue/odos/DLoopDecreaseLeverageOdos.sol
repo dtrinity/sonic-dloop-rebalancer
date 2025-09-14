@@ -17,7 +17,7 @@
 
 pragma solidity ^0.8.20;
 
-import { DLoopDecreaseLeverageBase, ERC20, IERC3156FlashLender } from "../../DLoopDecreaseLeverageBase.sol";
+import { DLoopDecreaseLeverageBase, ERC20, IERC3156FlashLender, DLoopCoreBase } from "../../DLoopDecreaseLeverageBase.sol";
 import { OdosSwapLogic, IOdosRouterV2 } from "./OdosSwapLogic.sol";
 
 /**
@@ -41,8 +41,25 @@ contract DLoopDecreaseLeverageOdos is DLoopDecreaseLeverageBase {
      * @param expectedOutputAmount Expected output amount
      * @return differenceTolerance The difference tolerance amount
      */
-    function swappedOutputDifferenceToleranceAmount(uint256 expectedOutputAmount) public pure override returns (uint256) {
+    function swappedOutputDifferenceToleranceAmount(
+        uint256 expectedOutputAmount
+    ) public pure override returns (uint256) {
         return OdosSwapLogic.swappedOutputDifferenceToleranceAmount(expectedOutputAmount);
+    }
+
+    /**
+     * @dev Estimates the amount of debt token to be repaid for the flash loan (swap from collateral token to debt token)
+     * @param rebalanceDebtAmount The amount of debt token to be repaid
+     * @param dLoopCore Address of the DLoopCore contract
+     * @return amount Amount of debt token to be repaid for the flash loan
+     */
+    function estimateFlashLoanSwapOutputDebtAmount(
+        uint256 rebalanceDebtAmount,
+        DLoopCoreBase dLoopCore
+    ) public view returns (uint256) {
+        ERC20 debtToken = dLoopCore.debtToken();
+        uint256 fee = flashLender.flashFee(address(debtToken), rebalanceDebtAmount);
+        return rebalanceDebtAmount + fee;
     }
 
     /**
@@ -56,17 +73,17 @@ contract DLoopDecreaseLeverageOdos is DLoopDecreaseLeverageBase {
         address receiver,
         uint256 deadline,
         bytes memory collateralToDebtTokenSwapData
-    ) internal override returns (uint256) {
-        return
-            OdosSwapLogic.swapExactOutput(
-                inputToken,
-                outputToken,
-                amountOut,
-                amountInMaximum,
-                receiver,
-                deadline,
-                collateralToDebtTokenSwapData,
-                odosRouter
-            );
+    ) internal override {
+        // Do not need to track the spent input token amount, it will be checked in the SwappableVault contract
+        OdosSwapLogic.swapExactOutput(
+            inputToken,
+            outputToken,
+            amountOut,
+            amountInMaximum,
+            receiver,
+            deadline,
+            collateralToDebtTokenSwapData,
+            odosRouter
+        );
     }
 }

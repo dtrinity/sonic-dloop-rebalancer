@@ -13,7 +13,10 @@ const IDLoopCoreABI = [
   "function balanceOf(address account) view returns (uint256)",
   "function getTotalCollateralAndDebtOfUserInBase(address user) view returns (uint256, uint256)",
   "function approve(address spender, uint256 amount) returns (bool)",
-  "function allowance(address owner, address spender) view returns (uint256)"
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function minDeviationBps() view returns (uint256)",
+  "function targetLeverageBps() view returns (uint256)",
+  "function setMinDeviationBps(uint256 _minDeviationBps) returns ()"
 ];
 
 const IDLoopQuoterABI = [
@@ -29,7 +32,8 @@ const IIncreaseLeverageOdosABI = [
 const IDecreaseLeverageOdosABI = [
   "function decreaseLeverage(uint256 rebalanceDebtAmount, bytes swapData, address dLoopCore) returns (uint256)",
   "function odosRouter() view returns (address)",
-  "function flashLender() view returns (address)"
+  "function flashLender() view returns (address)",
+  "function estimateFlashLoanSwapOutputDebtAmount(uint256 rebalanceDebtAmount, address dLoopCore) view returns (uint256)"
 ];
 
 
@@ -61,6 +65,9 @@ export interface DLoopCoreContract {
   getTotalCollateralAndDebtOfUserInBase(user: string): Promise<[bigint, bigint]>;
   approve(spender: string, amount: bigint): Promise<ethers.ContractTransactionResponse>;
   allowance(owner: string, spender: string): Promise<bigint>;
+  minDeviationBps(): Promise<bigint>;
+  targetLeverageBps(): Promise<bigint>;
+  setMinDeviationBps(_minDeviationBps: bigint): Promise<ethers.ContractTransactionResponse>;
 }
 
 export interface DLoopQuoterContract {
@@ -87,6 +94,10 @@ export interface DecreaseLeverageContract {
   ): Promise<ethers.ContractTransactionResponse>;
   odosRouter(): Promise<string>;
   flashLender(): Promise<string>;
+  estimateFlashLoanSwapOutputDebtAmount(
+    rebalanceDebtAmount: bigint,
+    dLoopCore: string,
+  ): Promise<bigint>;
 }
 
 export interface FlashLenderContract {
@@ -121,7 +132,7 @@ export class ContractManager {
     this.core = new ethers.Contract(
       config.contracts.dloopCore,
       IDLoopCoreABI,
-      provider,
+      _signer,
     ) as unknown as DLoopCoreContract;
 
     this.quoter = new ethers.Contract(

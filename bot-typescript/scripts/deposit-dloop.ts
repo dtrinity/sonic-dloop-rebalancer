@@ -1,10 +1,10 @@
 import { ethers } from "ethers";
-import { SONIC_MAINNET_CONFIG } from "../src/config/networks/sonic_mainnet";
 import { ContractManager } from "../src/bot/ContractManager";
 import { OdosClient } from "../src/bot/OdosClient";
 import { getTokenDecimals, getTokenSymbol, formatTokenAmountWithSymbol } from "../src/common/erc20";
 import { logger } from "../src/common/log";
-import { ONE_HUNDRED_PERCENT_BPS, ONE_PERCENT_BPS } from "../src/config/constants";
+import { ONE_PERCENT_BPS } from "../src/config/constants";
+import { getConfig } from "../src/config/config";
 
 interface DepositParams {
   depositAmount: string; // Amount to deposit in human readable format (e.g., "100" for 100 tokens)
@@ -12,7 +12,7 @@ interface DepositParams {
   receiver?: string; // Address to receive the shares, defaults to signer
 }
 
-const IDLoopDepositorOdosABI = [
+export const IDLoopDepositorOdosABI = [
   "function deposit(uint256 assets, address receiver, uint256 minOutputShares, bytes calldata debtTokenToCollateralSwapData, address dLoopCore) returns (uint256)",
   "function calculateMinOutputShares(uint256 depositAmount, uint256 slippageBps, address dLoopCore) view returns (uint256)",
   "function odosRouter() view returns (address)",
@@ -54,8 +54,10 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
   const { depositAmount, slippageBps, receiver } = params;
 
   try {
+    const config = getConfig();
+
     // Initialize contract manager
-    const contractManager = await ContractManager.create(SONIC_MAINNET_CONFIG);
+    const contractManager = await ContractManager.create(config);
 
     // Get signer address
     const signerAddress = await contractManager.getSignerAddress();
@@ -104,7 +106,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     const minOutputShares = await depositor.calculateMinOutputShares(
       depositAmountBigInt,
       BigInt(2.5 * ONE_PERCENT_BPS),
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
 
     logger.info(`Calculated minimum output shares: ${minOutputShares}`);
@@ -120,12 +122,12 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
     });
 
     // Create Odos client for swap data
-    const odosClient = new OdosClient(SONIC_MAINNET_CONFIG.network.odosApiUrl, SONIC_MAINNET_CONFIG.network.chainId);
+    const odosClient = new OdosClient(config.network.odosApiUrl, config.network.chainId);
 
     const estimatedFlashLoanSwapOutputCollateralAmount = await depositor.estimateFlashLoanSwapOutputCollateralAmount(
       depositAmountBigInt,
       minOutputShares,
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
 
     const estimatedFlashLoanSwapOutputCollateralAmountNormalized = ethers.formatUnits(estimatedFlashLoanSwapOutputCollateralAmount, collateralMetadata.decimals);
@@ -136,12 +138,12 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       estimatedFlashLoanSwapOutputCollateralAmountNormalized.toString(),
       debtTokenAddress,
       collateralTokenAddress,
-      SONIC_MAINNET_CONFIG.network.chainId,
+      config.network.chainId,
       0.5,
     ); // Rough estimate for 3x leverage
 
     const quoteRequest = {
-      chainId: SONIC_MAINNET_CONFIG.network.chainId,
+      chainId: config.network.chainId,
       inputTokens: [{
         tokenAddress: debtTokenAddress,
         amount: OdosClient.formatTokenAmount(estimatedInputDebtAmountNormalized, debtMetadata.decimals),
@@ -171,7 +173,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
 
     // Assemble transaction to get swap data
     const assembleRequest = {
-      chainId: SONIC_MAINNET_CONFIG.network.chainId,
+      chainId: config.network.chainId,
       liquidatorAccountAddress: signerAddress,
       collateralTokenAddress: collateralTokenAddress,
     };
@@ -192,7 +194,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       assets: depositAmountBigInt.toString(),
       receiver: receiverAddress,
       minOutputShares: minOutputShares.toString(),
-      dLoopCore: SONIC_MAINNET_CONFIG.contracts.dloopCore,
+      dLoopCore: config.contracts.dloopCore,
     });
 
     // Approve depositor to spend the collateral token if not enough allowance
@@ -232,7 +234,7 @@ async function depositAndCheckPosition(params: DepositParams): Promise<void> {
       receiverAddress,
       minOutputShares,
       swapData,
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
 
     logger.info("Deposit transaction submitted", {

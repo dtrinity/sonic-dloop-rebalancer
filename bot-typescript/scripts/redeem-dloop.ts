@@ -1,10 +1,10 @@
 import { ethers } from "ethers";
-import { SONIC_MAINNET_CONFIG } from "../src/config/networks/sonic_mainnet";
 import { ContractManager } from "../src/bot/ContractManager";
 import { OdosClient } from "../src/bot/OdosClient";
 import { getTokenDecimals, getTokenSymbol, formatTokenAmountWithSymbol } from "../src/common/erc20";
 import { logger } from "../src/common/log";
-import { ONE_HUNDRED_PERCENT_BPS, ONE_PERCENT_BPS } from "../src/config/constants";
+import { ONE_PERCENT_BPS } from "../src/config/constants";
+import { getConfig } from "../src/config/config";
 
 interface RedeemParams {
   redeemSharesAmount: string; // Amount of shares to redeem in human readable format (e.g., "100" for 100 shares)
@@ -12,7 +12,7 @@ interface RedeemParams {
   receiver?: string; // Address to receive the assets, defaults to signer
 }
 
-const IDLoopRedeemerOdosABI = [
+export const IDLoopRedeemerOdosABI = [
   "function redeem(uint256 shares, address receiver, uint256 minOutputCollateralAmount, bytes calldata collateralToDebtTokenSwapData, address dLoopCore) returns (uint256)",
   // "function redeemWithBreakPoint(uint256 shares, address receiver, uint256 minOutputCollateralAmount, bytes calldata collateralToDebtTokenSwapData, address dLoopCore, uint256 breakPoint) returns (uint256)",
   "function calculateMinOutputCollateral(uint256 shares, uint256 slippageBps, address dLoopCore) view returns (uint256)",
@@ -58,8 +58,10 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
   const { redeemSharesAmount, slippageBps, receiver } = params;
 
   try {
+    const config = getConfig();
+
     // Initialize contract manager
-    const contractManager = await ContractManager.create(SONIC_MAINNET_CONFIG);
+    const contractManager = await ContractManager.create(config);
 
     // Get signer address
     const signerAddress = await contractManager.getSignerAddress();
@@ -106,7 +108,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
 
     const estimateFlashLoanSwapOutputDebtAmount = await redeemer.estimateFlashLoanSwapOutputDebtAmount(
       redeemSharesBigInt,
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
     logger.info(`Estimated flash loan swap output debt amount: ${formatTokenAmountWithSymbol(estimateFlashLoanSwapOutputDebtAmount, debtMetadata.decimals, debtMetadata.symbol)}`);
 
@@ -121,7 +123,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     });
 
     // Create Odos client for swap data
-    const odosClient = new OdosClient(SONIC_MAINNET_CONFIG.network.odosApiUrl, SONIC_MAINNET_CONFIG.network.chainId);
+    const odosClient = new OdosClient(config.network.odosApiUrl, config.network.chainId);
 
     const estimateFlashLoanSwapOutputDebtAmountNormalized = ethers.formatUnits(estimateFlashLoanSwapOutputDebtAmount, debtMetadata.decimals);
 
@@ -131,13 +133,13 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
       estimateFlashLoanSwapOutputDebtAmountNormalized,
       collateralTokenAddress,
       debtTokenAddress,
-      SONIC_MAINNET_CONFIG.network.chainId,
+      config.network.chainId,
       0.0005,
     );
     console.log("estimatedInputCollateralAmountNormalized", estimatedInputCollateralAmountNormalized);
 
     // const exchangeRate = await odosClient.quoteExchangeRate(
-    //   SONIC_MAINNET_CONFIG.network.chainId,
+    //   config.network.chainId,
     //   {
     //     address: collateralTokenAddress,
     //     decimals: collateralMetadata.decimals,
@@ -151,7 +153,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     // console.log("exchangeRate", exchangeRate);
 
     const quoteRequest = {
-      chainId: SONIC_MAINNET_CONFIG.network.chainId,
+      chainId: config.network.chainId,
       inputTokens: [{
         tokenAddress: collateralTokenAddress,
         amount: OdosClient.formatTokenAmount(estimatedInputCollateralAmountNormalized, collateralMetadata.decimals),
@@ -177,7 +179,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
 
     // Assemble transaction to get swap data
     const assembleRequest = {
-      chainId: SONIC_MAINNET_CONFIG.network.chainId,
+      chainId: config.network.chainId,
       liquidatorAccountAddress: signerAddress,
       collateralTokenAddress: collateralTokenAddress,
     };
@@ -197,7 +199,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     const minOutputCollateralAmount = await redeemer.calculateMinOutputCollateral(
       redeemSharesBigInt,
       BigInt(0.1 * ONE_PERCENT_BPS),
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
     console.log("minOutputCollateralAmount", minOutputCollateralAmount);
 
@@ -205,7 +207,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
       shares: redeemSharesBigInt.toString(),
       receiver: receiverAddress,
       minOutputCollateralAmount: minOutputCollateralAmount.toString(),
-      dLoopCore: SONIC_MAINNET_CONFIG.contracts.dloopCore,
+      dLoopCore: config.contracts.dloopCore,
     });
 
     // Approve redeemer to spend shares if not enough allowance
@@ -215,7 +217,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
 
     // Create a core contract instance with signer for approval
     const coreContractWithSigner = new ethers.Contract(
-      SONIC_MAINNET_CONFIG.contracts.dloopCore,
+      config.contracts.dloopCore,
       ["function approve(address spender, uint256 amount) returns (bool)", "function allowance(address owner, address spender) view returns (uint256)"],
       contractManager.signer
     );
@@ -226,12 +228,12 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
         redeemerAddress,
         redeemSharesBigInt
       );
-      logger.info(`Approving redeemer ${redeemerAddress} to spend shares from ${SONIC_MAINNET_CONFIG.contracts.dloopCore}`, {
+      logger.info(`Approving redeemer ${redeemerAddress} to spend shares from ${config.contracts.dloopCore}`, {
         txHash: approveTx.hash,
       });
       await approveTx.wait();
     } else {
-      logger.info(`Already have enough allowance for redeemer ${redeemerAddress} to spend shares from ${SONIC_MAINNET_CONFIG.contracts.dloopCore}`);
+      logger.info(`Already have enough allowance for redeemer ${redeemerAddress} to spend shares from ${config.contracts.dloopCore}`);
     }
 
     logger.info(`Calculated minimum output collateral amount: ${formatTokenAmountWithSymbol(minOutputCollateralAmount, collateralMetadata.decimals, collateralMetadata.symbol)}`);
@@ -245,7 +247,7 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
       receiverAddress,
       minOutputCollateralAmount,
       swapData,
-      SONIC_MAINNET_CONFIG.contracts.dloopCore
+      config.contracts.dloopCore
     );
 
     logger.info("Redeem transaction submitted", {
