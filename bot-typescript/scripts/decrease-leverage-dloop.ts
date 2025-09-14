@@ -173,6 +173,20 @@ async function decreaseLeverageAndCheckPosition(params: DecreaseLeverageParams):
     const swapData = assembledQuote.transaction.data;
 
     // Step 5: Call decreaseLeverageContract.decreaseLeverage()
+
+    // Get current position before decrease leverage
+    const [sharesBeforeDecrease, collateralBefore, debtBefore] = await Promise.all([
+      contractManager.core.balanceOf(signerAddress),
+      (await contractManager.getCollateralToken()).balanceOf(signerAddress),
+      (await contractManager.getDebtToken()).balanceOf(signerAddress),
+    ]);
+
+    logger.info("Position before decrease leverage", {
+      shares: sharesBeforeDecrease.toString(),
+      collateral: formatTokenAmountWithSymbol(collateralBefore, collateralMetadata.decimals, collateralMetadata.symbol),
+      debt: formatTokenAmountWithSymbol(debtBefore, debtMetadata.decimals, debtMetadata.symbol),
+    });
+
     logger.info("Preparing decrease leverage transaction", {
       rebalanceDebtAmount: inputTokenAmount.toString(),
       dLoopCore: config.contracts.dloopCore,
@@ -195,6 +209,38 @@ async function decreaseLeverageAndCheckPosition(params: DecreaseLeverageParams):
       txHash: receipt!.hash,
       gasUsed: receipt!.gasUsed.toString(),
       blockNumber: receipt!.blockNumber,
+    });
+
+    // Check position after decrease leverage
+    const [sharesAfterDecrease, collateralAfter, debtAfter] = await Promise.all([
+      contractManager.core.balanceOf(signerAddress),
+      (await contractManager.getCollateralToken()).balanceOf(signerAddress),
+      (await contractManager.getDebtToken()).balanceOf(signerAddress),
+    ]);
+
+    logger.info("Position after decrease leverage", {
+      shares: sharesAfterDecrease.toString(),
+      collateral: formatTokenAmountWithSymbol(collateralAfter, collateralMetadata.decimals, collateralMetadata.symbol),
+      debt: formatTokenAmountWithSymbol(debtAfter, debtMetadata.decimals, debtMetadata.symbol),
+    });
+
+    // Verify position was updated
+    const sharesChange = sharesAfterDecrease - sharesBeforeDecrease;
+    const collateralChange = collateralAfter - collateralBefore;
+    const debtChange = debtAfter - debtBefore;
+
+    logger.info("Position changes after decrease leverage", {
+      sharesChange: sharesChange.toString(),
+      collateralChange: formatTokenAmountWithSymbol(
+        collateralChange,
+        collateralMetadata.decimals,
+        collateralMetadata.symbol
+      ),
+      debtChange: formatTokenAmountWithSymbol(
+        debtChange,
+        debtMetadata.decimals,
+        debtMetadata.symbol
+      ),
     });
 
     // Step 6: Check current leverage again and verify it decreased but not below target
@@ -257,7 +303,7 @@ async function getTokenMetadata(
 async function main(): Promise<void> {
   // Default parameters - can be modified as needed
   const decreaseLeverageParams: DecreaseLeverageParams = {
-    targetMinDeviationBps: "100", // 1% minimum deviation
+    targetMinDeviationBps: "0", // 0% minimum deviation
     slippageBps: BigInt(0.5 * ONE_PERCENT_BPS), // 0.5% slippage
   };
 

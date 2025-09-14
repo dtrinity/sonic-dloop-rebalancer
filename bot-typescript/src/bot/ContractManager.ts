@@ -45,6 +45,7 @@ const IFlashLenderABI = [
 const ERC20_ABI = [
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
+  "function balanceOf(address account) view returns (uint256)"
 ];
 
 // Typed contract interfaces for better type safety
@@ -108,6 +109,7 @@ export interface FlashLenderContract {
 export interface ERC20Contract {
   approve(spender: string, amount: bigint): Promise<ethers.ContractTransactionResponse>;
   allowance(owner: string, spender: string): Promise<bigint>;
+  balanceOf(account: string): Promise<bigint>;
 }
 
 export class ContractManager {
@@ -117,7 +119,6 @@ export class ContractManager {
   public readonly increaseOdos: IncreaseLeverageContract;
   public readonly decreaseOdos: DecreaseLeverageContract;
   public readonly signer: ethers.Signer;
-  public collateralToken: ERC20Contract | undefined;
   private cachedCollateralToken?: string;
   private cachedDebtToken?: string;
   private cachedFlashLender?: FlashLenderContract;
@@ -211,13 +212,20 @@ export class ContractManager {
   }
 
   async getCollateralToken(): Promise<ERC20Contract> {
-    if (!this.collateralToken) {
-      this.collateralToken = new ethers.Contract(
+    const collateralToken = new ethers.Contract(
         await this.core.collateralToken(),
         ERC20_ABI,
         this.signer,
       ) as unknown as ERC20Contract;
-    }
-    return this.collateralToken;
+    return collateralToken;
+  }
+
+  async getDebtToken(): Promise<ERC20Contract> {
+    const debtToken = new ethers.Contract(
+      await this.core.debtToken(),
+      ERC20_ABI,
+      this.signer,
+    ) as unknown as ERC20Contract
+    return debtToken;
   }
 }

@@ -113,8 +113,11 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     logger.info(`Estimated flash loan swap output debt amount: ${formatTokenAmountWithSymbol(estimateFlashLoanSwapOutputDebtAmount, debtMetadata.decimals, debtMetadata.symbol)}`);
 
     // Get current position before redeem
-    const sharesBeforeRedeem = await contractManager.core.balanceOf(signerAddress);
-    const [collateralBefore, debtBefore] = await contractManager.core.getTotalCollateralAndDebtOfUserInBase(signerAddress);
+    const [sharesBeforeRedeem, collateralBefore, debtBefore] = await Promise.all([
+      contractManager.core.balanceOf(signerAddress),
+      (await contractManager.getCollateralToken()).balanceOf(signerAddress),
+      (await contractManager.getDebtToken()).balanceOf(signerAddress),
+    ]);
 
     logger.info("Position before redeem", {
       shares: sharesBeforeRedeem.toString(),
@@ -263,8 +266,11 @@ async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
     });
 
     // Check position after redeem
-    const sharesAfterRedeem = await contractManager.core.balanceOf(receiverAddress);
-    const [collateralAfter, debtAfter] = await contractManager.core.getTotalCollateralAndDebtOfUserInBase(receiverAddress);
+    const [sharesAfterRedeem, collateralAfter, debtAfter] = await Promise.all([
+      contractManager.core.balanceOf(receiverAddress),
+      (await contractManager.getCollateralToken()).balanceOf(receiverAddress),
+      (await contractManager.getDebtToken()).balanceOf(receiverAddress),
+    ]);
 
     logger.info("Position after redeem", {
       shares: sharesAfterRedeem.toString(),
