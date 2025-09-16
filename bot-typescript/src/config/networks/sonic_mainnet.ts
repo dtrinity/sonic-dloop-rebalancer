@@ -25,7 +25,7 @@ export const SONIC_MAINNET_CONFIG: {
   contracts: {
     dloopCore: "0x269dB736a71d2e95Eea88487A5a0b51E8E78BDdf",
     dloopQuoter: "0x3409736eEC8EBA0A4bec98cC01d521068090d03B",
-    increaseOdos: "0x3520Fdd1AEe595a1bF9499a756118f919Fa69809",
+    increaseOdos: "0xd068C5B2fB8e3aE33A8E17a2CF8D49aEEC271Bbc",
     decreaseOdos: "0xcA1c5421a7c3f2B4a8163dd3aBb051fA6A452F1b",
   },
   policy: {

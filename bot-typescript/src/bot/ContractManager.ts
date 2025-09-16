@@ -26,7 +26,8 @@ const IDLoopQuoterABI = [
 const IIncreaseLeverageOdosABI = [
   "function increaseLeverage(uint256 rebalanceCollateralAmount, bytes swapData, address dLoopCore) returns (uint256)",
   "function odosRouter() view returns (address)",
-  "function flashLender() view returns (address)"
+  "function flashLender() view returns (address)",
+  "function estimateFlashLoanSwapOutputCollateralAmount(uint256 rebalanceCollateralAmount) view returns (uint256)"
 ];
 
 const IDecreaseLeverageOdosABI = [
@@ -46,6 +47,12 @@ const ERC20_ABI = [
   "function approve(address spender, uint256 amount) returns (bool)",
   "function allowance(address owner, address spender) view returns (uint256)",
   "function balanceOf(address account) view returns (uint256)"
+];
+
+// dLEND Pool ABI - only the functions we need for the donation attack
+const IDLEND_POOL_ABI = [
+  "function supply(address asset, uint256 amount, address onBehalfOf, uint16 referralCode) external",
+  "function getUserAccountData(address user) external view returns (uint256 totalCollateralBase, uint256 totalDebtBase, uint256 availableBorrowsBase, uint256 currentLiquidationThreshold, uint256 ltv, uint256 healthFactor)"
 ];
 
 // Typed contract interfaces for better type safety
@@ -85,6 +92,9 @@ export interface IncreaseLeverageContract {
   ): Promise<ethers.ContractTransactionResponse>;
   odosRouter(): Promise<string>;
   flashLender(): Promise<string>;
+  estimateFlashLoanSwapOutputCollateralAmount(
+    rebalanceCollateralAmount: bigint,
+  ): Promise<bigint>;
 }
 
 export interface DecreaseLeverageContract {
@@ -110,6 +120,16 @@ export interface ERC20Contract {
   approve(spender: string, amount: bigint): Promise<ethers.ContractTransactionResponse>;
   allowance(owner: string, spender: string): Promise<bigint>;
   balanceOf(account: string): Promise<bigint>;
+}
+
+export interface DLENDPoolContract {
+  supply(
+    asset: string,
+    amount: bigint,
+    onBehalfOf: string,
+    referralCode: number
+  ): Promise<ethers.ContractTransactionResponse>;
+  getUserAccountData(user: string): Promise<[bigint, bigint, bigint, bigint, bigint, bigint]>;
 }
 
 export class ContractManager {
@@ -227,5 +247,28 @@ export class ContractManager {
       this.signer,
     ) as unknown as ERC20Contract
     return debtToken;
+  }
+
+  async getDLENDPool(): Promise<{ pool: DLENDPoolContract; poolAddress: string }> {
+    // Add dLEND pool functions to the core ABI temporarily
+    const dLENDPoolABI = [
+      "function getLendingPoolAddress() view returns (address)",
+    ];
+
+    const coreWithDLEND = new ethers.Contract(
+      this.config.contracts.dloopCore,
+      [...IDLoopCoreABI, ...dLENDPoolABI],
+      this.provider, // Use provider for view calls
+    ) as any;
+
+    const poolAddress = await coreWithDLEND.getLendingPoolAddress();
+
+    const dLENDPool = new ethers.Contract(
+      poolAddress,
+      IDLEND_POOL_ABI,
+      this.signer,
+    ) as unknown as DLENDPoolContract;
+
+    return { pool: dLENDPool, poolAddress };
   }
 }
