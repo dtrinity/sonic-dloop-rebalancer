@@ -1,61 +1,101 @@
-# DLoop Rebalancer Bot Makefile
+.PHONY: help install build test lint clean compile deploy-contracts run docker.build.arm64 docker.build.amd64 docker.run
 
-.PHONY: help install compile test lint format docker.build docker.run clean
-
-help: ## Show this help message
+# Help target - shows available commands
+help:
 	@echo "Available commands:"
-	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+	@echo "  make install                          - Install dependencies for both sub-repos"
+	@echo "  make build                            - Build both sub-repos"
+	@echo "  make test                             - Run tests on both sub-repos"
+	@echo "  make lint                             - Run linter on both sub-repos"
+	@echo "  make clean                            - Clean build artifacts in both sub-repos"
+	@echo "  make compile                          - Compile Solidity contracts"
+	@echo "  make deploy-contracts.mainnet         - Deploy contracts to mainnet"
+	@echo "  make deploy-contracts.testnet         - Deploy contracts to testnet"
+	@echo "  make run.mainnet                      - Run TypeScript bot on mainnet"
+	@echo "  make run.testnet                      - Run TypeScript bot on testnet"
+	@echo "  make docker.build.arm64               - Build Docker image for ARM64"
+	@echo "  make docker.build.amd64               - Build Docker image for AMD64"
+	@echo "  make docker.run.mainnet               - Run Docker container on mainnet"
+	@echo "  make docker.run.testnet               - Run Docker container on testnet"
 
-install: ## Install dependencies
-	yarn install
+# Install dependencies for both sub-repos
+install:
+	@echo "Installing dependencies for Solidity contracts..."
+	cd bot-solidity-contracts && yarn install
+	@echo "Installing dependencies for TypeScript bot..."
+	cd bot-typescript && yarn install
 
-compile: ## Compile contracts and generate typechain types
-	yarn hardhat compile
+# Build both sub-repos
+build:
+	@echo "Building Solidity contracts..."
+	cd bot-solidity-contracts && make compile
+	@echo "Building TypeScript bot..."
+	cd bot-typescript && make build
 
-test: ## Run tests
-	yarn hardhat test
+# Run tests on both sub-repos
+test:
+	@echo "Running tests on Solidity contracts..."
+	cd bot-solidity-contracts && yarn test
+	@echo "Running tests on TypeScript bot..."
+	cd bot-typescript && yarn test
 
-lint: ## Lint TypeScript code
-	@yarn eslint --fix typescript/**/*.ts test/*.ts
+# Run linter on both sub-repos
+lint:
+	@echo "Running linter on Solidity contracts..."
+	cd bot-solidity-contracts && make lint
+	@echo "Running linter on TypeScript bot..."
+	cd bot-typescript && make lint
 
-format: ## Format TypeScript code
-	yarn format
+# Clean build artifacts in both sub-repos
+clean:
+	@echo "Cleaning build artifacts in Solidity contracts..."
+	cd bot-solidity-contracts && make clean
+	@echo "Cleaning build artifacts in TypeScript bot..."
+	cd bot-typescript && make clean
 
-docker.build: ## Build Docker image
-	docker build --build-arg HOST_PWD=$(PWD) -t dloop-rebalancer:latest .
+# Compile Solidity contracts
+compile:
+	@echo "Compiling Solidity contracts..."
+	cd bot-solidity-contracts && make compile
 
-docker.run: ## Run bot in Docker container
-	docker run --rm -it \
-		--env-file .env \
-		dloop-rebalancer:latest
+# Deploy contracts to mainnet
+deploy-contracts.mainnet:
+	@echo "Deploying contracts to mainnet..."
+	cd bot-solidity-contracts && make deploy.mainnet
 
-docker.run.daemon: ## Run bot in Docker container as daemon
-	docker run -d \
-		--name dloop-rebalancer \
-		--env-file .env \
-		--restart unless-stopped \
-		dloop-rebalancer:latest
+# Deploy contracts to testnet
+deploy-contracts.testnet:
+	@echo "Deploying contracts to testnet..."
+	cd bot-solidity-contracts && make deploy.testnet
 
-docker.stop: ## Stop Docker daemon
-	docker stop dloop-rebalancer || true
-	docker rm dloop-rebalancer || true
+# Run TypeScript bot on mainnet
+run.mainnet:
+	@echo "Running TypeScript bot on mainnet..."
+	cd bot-typescript && make run network=mainnet
 
-clean: ## Clean build artifacts
-	rm -rf artifacts/ cache/ typechain-types/ node_modules/ dist/
+# Run TypeScript bot on testnet
+run.testnet:
+	@echo "Running TypeScript bot on testnet..."
+	cd bot-typescript && make run network=testnet
 
-env-example: ## Create example environment file
-	@echo "Creating example .env file..."
-	@echo "# Network Selection" > .env.example
-	@echo "NETWORK=localhost" >> .env.example
-	@echo "" >> .env.example
-	@echo "# Private key (required)" >> .env.example
-	@echo "PRIVATE_KEY=" >> .env.example
-	@echo "" >> .env.example
-	@echo "# Optional: Dry run (must be 'true', 'false', or empty)" >> .env.example
-	@echo "DRY_RUN=" >> .env.example
-	@echo "" >> .env.example
-	@echo "# Notifications" >> .env.example
-	@echo "SLACK_TOKEN=" >> .env.example
-	@echo "SLACK_CHANNEL=#dloop-rebalancer" >> .env.example
-	@echo "LOG_LEVEL=info" >> .env.example
-	@echo ".env.example file created. Copy to .env and edit with your actual values."
+# Build Docker image for ARM64
+docker.build.arm64:
+	@echo "Building Docker image for ARM64..."
+	cd bot-typescript && make docker.build.arm64
+
+# Build Docker image for AMD64
+docker.build.amd64:
+	@echo "Building Docker image for AMD64..."
+	cd bot-typescript && make docker.build.amd64
+
+# Run Docker container on mainnet
+docker.run.mainnet:
+	@echo "Running Docker container on mainnet..."
+	cd bot-typescript && make docker.run network=mainnet
+
+# Run Docker container on testnet
+docker.run.testnet:
+	@echo "Running Docker container on testnet..."
+	cd bot-typescript && make docker.run network=testnet
+
+.DEFAULT_GOAL := help

@@ -1,0 +1,374 @@
+import { ethers } from "ethers";
+import { ContractManager } from "../src/bot/ContractManager";
+import { OdosClient } from "../src/bot/OdosClient";
+import { getTokenDecimals, getTokenSymbol, formatTokenAmountWithSymbol } from "../src/common/erc20";
+import { logger } from "../src/common/log";
+import { ONE_PERCENT_BPS } from "../src/config/constants";
+import { getConfig } from "../src/config/config";
+
+interface RedeemParams {
+  redeemSharesAmount: string; // Amount of shares to redeem in human readable format (e.g., "100" for 100 shares)
+  slippageBps: bigint; // Slippage tolerance in basis points (e.g., 50 for 0.5%)
+  receiver?: string; // Address to receive the assets, defaults to signer
+}
+
+export const IDLoopRedeemerOdosABI = [
+  "function redeem(uint256 shares, address receiver, uint256 minOutputCollateralAmount, bytes calldata collateralToDebtTokenSwapData, address dLoopCore) returns (uint256)",
+  // "function redeemWithBreakPoint(uint256 shares, address receiver, uint256 minOutputCollateralAmount, bytes calldata collateralToDebtTokenSwapData, address dLoopCore, uint256 breakPoint) returns (uint256)",
+  "function calculateMinOutputCollateral(uint256 shares, uint256 slippageBps, address dLoopCore) view returns (uint256)",
+  "function odosRouter() view returns (address)",
+  "function flashLender() view returns (address)",
+  "function estimateFlashLoanSwapOutputDebtAmount(uint256 shares, address dLoopCore) view returns (uint256)",
+];
+
+export interface DLoopRedeemerContract {
+  getAddress(): Promise<string>;
+  redeem(
+    shares: bigint,
+    receiver: string,
+    minOutputCollateralAmount: bigint,
+    collateralToDebtTokenSwapData: string,
+    dLoopCore: string,
+  ): Promise<ethers.ContractTransactionResponse>;
+  // redeemWithBreakPoint(
+  //   shares: bigint,
+  //   receiver: string,
+  //   minOutputCollateralAmount: bigint,
+  //   collateralToDebtTokenSwapData: string,
+  //   dLoopCore: string,
+  //   breakPoint: bigint,
+  // ): Promise<ethers.ContractTransactionResponse>;
+  calculateMinOutputCollateral(
+    shares: bigint,
+    slippageBps: bigint,
+    dLoopCore: string,
+  ): Promise<bigint>;
+  odosRouter(): Promise<string>;
+  flashLender(): Promise<string>;
+  estimateFlashLoanSwapOutputDebtAmount(
+    shares: bigint,
+    dLoopCore: string,
+  ): Promise<bigint>;
+}
+
+/**
+ * Redeem shares via redeemer.redeem() and check position
+ */
+async function redeemAndCheckPosition(params: RedeemParams): Promise<void> {
+  const { redeemSharesAmount, slippageBps, receiver } = params;
+
+  try {
+    const config = getConfig();
+
+    // Initialize contract manager
+    const contractManager = await ContractManager.create(config);
+
+    // Get signer address
+    const signerAddress = await contractManager.getSignerAddress();
+    const receiverAddress = receiver || signerAddress;
+
+    logger.info("Starting redeem process", {
+      signer: signerAddress,
+      receiver: receiverAddress,
+      redeemSharesAmount,
+      slippageBps,
+    });
+
+    const redeemer = new ethers.Contract(
+      "0x793037226cA2a9e6C606Be5d78d84f565f82EE45",
+      // "0xa521e28df9e83fceA5aD806E2d04fD53BFb5B709", // buggy
+      IDLoopRedeemerOdosABI,
+      contractManager.signer,
+    ) as unknown as DLoopRedeemerContract;
+
+    // Get token addresses
+    const collateralTokenAddress = await contractManager.getCollateralTokenAddress();
+    const debtTokenAddress = await contractManager.getDebtTokenAddress();
+
+    logger.info("Token addresses retrieved", {
+      collateralToken: collateralTokenAddress,
+      debtToken: debtTokenAddress,
+    });
+
+    // Get token metadata for display
+    const provider = contractManager.provider;
+    const [collateralMetadata, debtMetadata] = await Promise.all([
+      getTokenMetadata(provider, collateralTokenAddress),
+      getTokenMetadata(provider, debtTokenAddress),
+    ]);
+
+    logger.info("Token metadata retrieved", {
+      collateral: `${collateralMetadata.symbol} (${collateralMetadata.decimals} decimals)`,
+      debt: `${debtMetadata.symbol} (${debtMetadata.decimals} decimals)`,
+    });
+
+    // Parse redeem shares amount
+    const redeemSharesBigInt = ethers.parseUnits(redeemSharesAmount, 18); // Shares are typically 18 decimals
+    logger.info(`Parsed redeem shares amount: ${formatTokenAmountWithSymbol(redeemSharesBigInt, 18, "SHARES")}`);
+
+    const estimateFlashLoanSwapOutputDebtAmount = await redeemer.estimateFlashLoanSwapOutputDebtAmount(
+      redeemSharesBigInt,
+      config.contracts.dloopCore
+    );
+    logger.info(`Estimated flash loan swap output debt amount: ${formatTokenAmountWithSymbol(estimateFlashLoanSwapOutputDebtAmount, debtMetadata.decimals, debtMetadata.symbol)}`);
+
+    // Get current position before redeem
+    const [sharesBeforeRedeem, collateralBefore, debtBefore] = await Promise.all([
+      contractManager.core.balanceOf(signerAddress),
+      (await contractManager.getCollateralToken()).balanceOf(signerAddress),
+      (await contractManager.getDebtToken()).balanceOf(signerAddress),
+    ]);
+
+    logger.info("Position before redeem", {
+      shares: sharesBeforeRedeem.toString(),
+      collateralBase: collateralBefore.toString(),
+      debtBase: debtBefore.toString(),
+    });
+
+    // Create Odos client for swap data
+    const odosClient = new OdosClient(config.network.odosApiUrl, config.network.chainId);
+
+    const estimateFlashLoanSwapOutputDebtAmountNormalized = ethers.formatUnits(estimateFlashLoanSwapOutputDebtAmount, debtMetadata.decimals);
+
+    console.log("estimateFlashLoanSwapOutputDebtAmountNormalized", estimateFlashLoanSwapOutputDebtAmountNormalized);
+
+    const estimatedInputCollateralAmountNormalized = await odosClient.calculateInputAmount(
+      estimateFlashLoanSwapOutputDebtAmountNormalized,
+      collateralTokenAddress,
+      debtTokenAddress,
+      config.network.chainId,
+      0.0005,
+    );
+    console.log("estimatedInputCollateralAmountNormalized", estimatedInputCollateralAmountNormalized);
+
+    // const exchangeRate = await odosClient.quoteExchangeRate(
+    //   config.network.chainId,
+    //   {
+    //     address: collateralTokenAddress,
+    //     decimals: collateralMetadata.decimals,
+    //   },
+    //   {
+    //     address: debtTokenAddress,
+    //     decimals: debtMetadata.decimals,
+    //   },
+    //   'output'
+    // );
+    // console.log("exchangeRate", exchangeRate);
+
+    const quoteRequest = {
+      chainId: config.network.chainId,
+      inputTokens: [{
+        tokenAddress: collateralTokenAddress,
+        amount: OdosClient.formatTokenAmount(estimatedInputCollateralAmountNormalized, collateralMetadata.decimals),
+      }],
+      outputTokens: [{
+        tokenAddress: debtTokenAddress,
+        proportion: 1,
+      }],
+      userAddr: signerAddress,
+      slippageLimitPercent: (Number(slippageBps) / ONE_PERCENT_BPS), // Convert bps to percent
+      disableRFQs: true,
+      compact: true
+    };
+
+    logger.info("Requesting Odos quote for swap data", quoteRequest);
+
+    const quoteResponse = await odosClient.getQuote(quoteRequest);
+    logger.info("Odos quote received", {
+      pathId: quoteResponse.pathId,
+      inAmounts: quoteResponse.inAmounts,
+      outAmounts: quoteResponse.outAmounts,
+    });
+
+    // Assemble transaction to get swap data
+    const assembleRequest = {
+      chainId: config.network.chainId,
+      liquidatorAccountAddress: signerAddress,
+      collateralTokenAddress: collateralTokenAddress,
+    };
+
+    const assembledQuote = await odosClient.getAssembledQuote(
+      await redeemer.odosRouter(),
+      contractManager.signer,
+      odosClient,
+      quoteResponse,
+      assembleRequest,
+      await redeemer.getAddress()
+    );
+
+    // Extract swap data from the assembled transaction
+    const swapData = assembledQuote.transaction.data;
+
+    const minOutputCollateralAmount = await redeemer.calculateMinOutputCollateral(
+      redeemSharesBigInt,
+      BigInt(0.1 * ONE_PERCENT_BPS),
+      config.contracts.dloopCore
+    );
+    console.log("minOutputCollateralAmount", minOutputCollateralAmount);
+
+    logger.info("Preparing redeem transaction", {
+      shares: redeemSharesBigInt.toString(),
+      receiver: receiverAddress,
+      minOutputCollateralAmount: minOutputCollateralAmount.toString(),
+      dLoopCore: config.contracts.dloopCore,
+    });
+
+    // Approve redeemer to spend shares if not enough allowance
+    // Note: For ERC4626 vaults, shares are ERC20 tokens, so we need to approve the redeemer contract
+    // to transfer shares from the signer to itself
+    const redeemerAddress = await redeemer.getAddress();
+
+    // Create a core contract instance with signer for approval
+    const coreContractWithSigner = new ethers.Contract(
+      config.contracts.dloopCore,
+      ["function approve(address spender, uint256 amount) returns (bool)", "function allowance(address owner, address spender) view returns (uint256)"],
+      contractManager.signer
+    );
+
+    const allowance = await coreContractWithSigner.allowance(signerAddress, redeemerAddress);
+    if (allowance < redeemSharesBigInt) {
+      const approveTx = await coreContractWithSigner.approve(
+        redeemerAddress,
+        redeemSharesBigInt
+      );
+      logger.info(`Approving redeemer ${redeemerAddress} to spend shares from ${config.contracts.dloopCore}`, {
+        txHash: approveTx.hash,
+      });
+      await approveTx.wait();
+    } else {
+      logger.info(`Already have enough allowance for redeemer ${redeemerAddress} to spend shares from ${config.contracts.dloopCore}`);
+    }
+
+    logger.info(`Calculated minimum output collateral amount: ${formatTokenAmountWithSymbol(minOutputCollateralAmount, collateralMetadata.decimals, collateralMetadata.symbol)}`);
+
+    const breakPoint = 0n;
+
+    // Execute redeem
+    logger.info("Executing redeem transaction...");
+    const redeemTx = await redeemer.redeem(
+      redeemSharesBigInt,
+      receiverAddress,
+      minOutputCollateralAmount,
+      swapData,
+      config.contracts.dloopCore
+    );
+
+    logger.info("Redeem transaction submitted", {
+      txHash: redeemTx.hash,
+    });
+
+    // Wait for transaction confirmation
+    const receipt = await redeemTx.wait(3);
+    logger.info("Redeem transaction confirmed", {
+      txHash: receipt!.hash,
+      gasUsed: receipt!.gasUsed.toString(),
+      blockNumber: receipt!.blockNumber,
+    });
+
+    // Check position after redeem
+    const [sharesAfterRedeem, collateralAfter, debtAfter] = await Promise.all([
+      contractManager.core.balanceOf(receiverAddress),
+      (await contractManager.getCollateralToken()).balanceOf(receiverAddress),
+      (await contractManager.getDebtToken()).balanceOf(receiverAddress),
+    ]);
+
+    logger.info("Position after redeem", {
+      shares: sharesAfterRedeem.toString(),
+      collateralBase: collateralAfter.toString(),
+      debtBase: debtAfter.toString(),
+    });
+
+    // Verify position was updated
+    const sharesDecrease = sharesBeforeRedeem - sharesAfterRedeem;
+    const collateralDecrease = collateralBefore - collateralAfter;
+    const debtDecrease = debtBefore - debtAfter;
+
+    if (sharesDecrease > 0n) {
+      logger.info("✅ Position successfully updated!", {
+        sharesDecrease: sharesDecrease.toString(),
+        collateralDecrease: collateralDecrease.toString(),
+        debtDecrease: debtDecrease.toString(),
+      });
+
+      // Format amounts for display
+      const formattedCollateralDecrease = formatTokenAmountWithSymbol(
+        collateralDecrease,
+        collateralMetadata.decimals,
+        collateralMetadata.symbol
+      );
+      const formattedDebtDecrease = formatTokenAmountWithSymbol(
+        debtDecrease,
+        debtMetadata.decimals,
+        debtMetadata.symbol
+      );
+
+      logger.info("Position summary", {
+        collateralReceived: formattedCollateralDecrease,
+        debtRepaid: formattedDebtDecrease,
+        sharesRedeemed: sharesDecrease.toString(),
+      });
+    } else {
+      logger.error("❌ Position update failed - no shares decrease detected", {
+        sharesBefore: sharesBeforeRedeem.toString(),
+        sharesAfter: sharesAfterRedeem.toString(),
+      });
+      throw new Error("Position update failed - no shares were redeemed");
+    }
+
+  } catch (error) {
+    console.error(error);
+    logger.error("Redeem failed", {
+      error: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+    throw error;
+  }
+}
+
+/**
+ * Helper function to get token metadata
+ */
+async function getTokenMetadata(
+  provider: ethers.Provider,
+  tokenAddress: string
+): Promise<{ decimals: number; symbol: string }> {
+  const [decimals, symbol] = await Promise.all([
+    getTokenDecimals(provider, tokenAddress),
+    getTokenSymbol(provider, tokenAddress),
+  ]);
+  return { decimals, symbol };
+}
+
+/**
+ * Main execution function
+ */
+async function main(): Promise<void> {
+  // Default parameters - can be modified as needed
+  const redeemParams: RedeemParams = {
+    redeemSharesAmount: "0.291060356107956331",
+    slippageBps: BigInt(0.5 * ONE_PERCENT_BPS), // 0.5% slippage
+    // receiver: "0x..." // optional, defaults to signer
+  };
+
+  logger.info("Starting dLoop redeem script", redeemParams);
+
+  try {
+    await redeemAndCheckPosition(redeemParams);
+    logger.info("✅ Redeem script completed successfully!");
+  } catch (error) {
+    logger.error("❌ Redeem script failed", {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    process.exit(1);
+  }
+}
+
+// Execute if run directly
+if (require.main === module) {
+  main().catch((error) => {
+    console.error("Unhandled error:", error);
+    process.exit(1);
+  });
+}
+
+export { redeemAndCheckPosition, RedeemParams };
